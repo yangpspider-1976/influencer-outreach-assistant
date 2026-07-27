@@ -4,23 +4,69 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
+    "test:acceptance": "node scripts/acceptance-walkthrough.mjs",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "verify:no-demo-creds": "node scripts/verify-no-demo-credentials.mjs",
+    "db:demo-reset": "tsx prisma/reset-demo-data.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "exceljs": "^4.4.0",
+    "jose": "^6.2.3",
+    "lucide-react": "^1.25.0",
     "next": "16.2.10",
+    "papaparse": "^5.5.4",
+    "pg": "^8.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "playwright": "^1.61.1",
+    "prisma": "^7.9.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.1",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "@prisma/engines": true,
+    "esbuild": true,
+    "prisma": true,
+    "sharp": true,
+    "unrs-resolver": true
+  },
+  "overrides": {
+    "sharp": "^0.35.3",
+    "uuid": "^11.1.1",
+    "postcss": "^8.5.21"
   }
 }

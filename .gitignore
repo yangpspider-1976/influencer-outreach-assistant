@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# private object storage (uploads + generated exports)
+/.storage
+
+# allow the environment template to be committed
+!.env.example
+
+# generated Prisma client (recreated by `prisma generate` on install)
+/src/generated
+
+# UI smoke-test screenshots
+/shots

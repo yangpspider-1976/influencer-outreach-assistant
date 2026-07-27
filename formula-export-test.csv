@@ -1,0 +1,2 @@
+influencer_name,instagram_url,notes
+Formula Export Test,https://instagram.com/formulaexporttest,"=HYPERLINK(""http://evil.test"",""click"")"

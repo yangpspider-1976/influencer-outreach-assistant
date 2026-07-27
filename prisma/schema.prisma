@@ -1,0 +1,641 @@
+// QROAD Influencer Outreach Assistant — database schema
+// Implements the data model defined in §13 of the Developer Work Order.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+}
+
+// Connection URL lives in prisma.config.ts (Prisma 7); the runtime client
+// connects through the node-postgres driver adapter in src/lib/db.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enumerations
+// ---------------------------------------------------------------------------
+
+enum RoleKey {
+  ADMIN
+  CAMPAIGN_MANAGER
+  OPERATOR
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// FR-004
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum Platform {
+  INSTAGRAM
+  FACEBOOK
+}
+
+enum ProfileValidity {
+  UNKNOWN
+  VALID
+  INVALID
+}
+
+/// FR-021 — the full outreach status model.
+enum OutreachStatus {
+  NOT_CONTACTED
+  READY
+  SENT
+  FOLLOW_UP_DUE
+  REPLIED
+  INTERESTED
+  NEGOTIATING
+  CONFIRMED
+  DECLINED
+  NO_RESPONSE
+  INVALID
+  DUPLICATE
+  DO_NOT_CONTACT
+}
+
+/// Recruitment pipeline lane (§11 Pipeline Board).
+enum PipelineStatus {
+  NONE
+  REPLIED
+  INTERESTED
+  NEGOTIATING
+  CONFIRMED
+  DECLINED
+  NO_RESPONSE
+}
+
+enum TemplateStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+enum AttemptType {
+  FIRST_CONTACT
+  FOLLOW_UP
+}
+
+enum AttemptOutcome {
+  SENT
+  SKIPPED
+  INVALID
+  DUPLICATE
+  DO_NOT_CONTACT
+  SAVED_FOR_LATER
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum ImportStatus {
+  UPLOADED
+  MAPPED
+  VALIDATED
+  COMMITTED
+  FAILED
+}
+
+/// §8 — every parsed row is classified before commit.
+enum ImportRowStatus {
+  VALID
+  WARNING
+  REJECTED
+  IMPORTED
+  SKIPPED
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ExportFormat {
+  CSV
+  XLSX
+}
+
+// ---------------------------------------------------------------------------
+// Identity and access
+// ---------------------------------------------------------------------------
+
+model Role {
+  id            String   @id @default(cuid())
+  key           RoleKey  @unique
+  name          String
+  description   String   @default("")
+  /// Permission set per §5 permission matrix; consumed by src/lib/rbac.ts.
+  permissionSet Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  /// Argon2id hash (SEC-002). Never a plaintext password.
+  passwordHash String
+  name         String
+  roleId       String
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  /// Bumped on disable / password change to invalidate live sessions (SEC-011).
+  sessionEpoch Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  ownedCampaigns     Campaign[]           @relation("CampaignOwner")
+  assignedRecords    CampaignInfluencer[] @relation("RecordAssignee")
+  lockedRecords      CampaignInfluencer[] @relation("RecordLock")
+  dncOverrides       CampaignInfluencer[] @relation("DncOverrideBy")
+  dncSet             Influencer[]         @relation("DncSetBy")
+  createdTemplates   MessageTemplate[]    @relation("TemplateCreator")
+  approvedVersions   TemplateVersion[]    @relation("VersionApprover")
+  outreachAttempts   OutreachAttempt[]    @relation("AttemptCreator")
+  followUpTasks      FollowUpTask[]       @relation("FollowUpAssignee")
+  imports            Import[]             @relation("ImportUploader")
+  exports            ExportJob[]          @relation("ExportRequester")
+  auditLogs          AuditLog[]           @relation("AuditActor")
+
+  @@index([roleId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Clients and campaigns
+// ---------------------------------------------------------------------------
+
+model Client {
+  id           String       @id @default(cuid())
+  name         String       @unique
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  notes        String       @default("")
+  status       ClientStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  campaigns Campaign[]
+
+  @@map("clients")
+}
+
+model Campaign {
+  id                  String         @id @default(cuid())
+  clientId            String
+  name                String
+  location            String
+  visitStart          DateTime
+  visitEnd            DateTime
+  deliverables        String
+  /// Short single-line representation used inside copied DM text (§7).
+  deliverablesShort   String         @default("")
+  compensation        String
+  applicationDeadline DateTime?
+  targetCategory      String         @default("")
+  targetLocation      String         @default("")
+  /// Authorized link only; private briefs are stored as briefFileKey (SEC-008).
+  briefUrl            String?
+  briefFileKey        String?
+  briefFileName       String?
+  /// Whether {{brief_link}} may be rendered into outreach copy (§9).
+  briefLinkEnabled    Boolean        @default(false)
+  ownerId             String
+  templateVersionId   String?
+  status              CampaignStatus @default(DRAFT)
+  notes               String         @default("")
+  /// 0–2 follow-up reminder offsets in days after Sent (§7). Default [3, 7].
+  followUpOffsetDays  Int[]          @default([3, 7])
+  activatedAt         DateTime?
+  archivedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  client          Client           @relation(fields: [clientId], references: [id])
+  owner           User             @relation("CampaignOwner", fields: [ownerId], references: [id])
+  templateVersion TemplateVersion? @relation(fields: [templateVersionId], references: [id])
+
+  records CampaignInfluencer[]
+  imports Import[]
+
+  @@index([clientId])
+  @@index([ownerId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+// ---------------------------------------------------------------------------
+// Influencer database
+// ---------------------------------------------------------------------------
+
+model Influencer {
+  id                    String    @id @default(cuid())
+  displayName           String
+  firstName             String?
+  category              String    @default("")
+  location              String    @default("")
+  /// Value exactly as supplied by QROAD; never scraped (§15 / SEC-007).
+  followerCountRaw      String?
+  followerCountNumeric  Int?
+  email                 String?
+  phone                 String?
+  rate                  String?
+  notes                 String    @default("")
+  dncFlag               Boolean   @default(false)
+  dncReason             String?
+  dncSetById            String?
+  dncSetAt              DateTime?
+  /// Marks records created by the demo seed so the dev UI can list them apart
+  /// from real, user-entered creators. Always false for production data.
+  isDemo                Boolean   @default(false)
+  /// Soft delete — historical reports and audit must stay resolvable (§13).
+  archivedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  dncSetBy User? @relation("DncSetBy", fields: [dncSetById], references: [id])
+
+  profiles SocialProfile[]
+  records  CampaignInfluencer[]
+  tags     InfluencerTag[]
+
+  @@index([displayName])
+  @@index([dncFlag])
+  @@index([isDemo])
+  @@map("influencers")
+}
+
+model SocialProfile {
+  id             String          @id @default(cuid())
+  influencerId   String
+  platform       Platform
+  /// Preserved exactly as uploaded (FR-010).
+  originalUrl    String
+  /// Canonical form used for dedupe (FR-010 / FR-011).
+  normalizedUrl  String
+  usernameHint   String?
+  preferredFlag  Boolean         @default(false)
+  validityStatus ProfileValidity @default(UNKNOWN)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  influencer Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  /// §13 — uniqueness on normalized platform profile URL per platform.
+  @@unique([platform, normalizedUrl])
+  @@index([influencerId])
+  @@map("social_profiles")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("blue")
+  createdAt DateTime @default(now())
+
+  influencers InfluencerTag[]
+
+  @@map("tags")
+}
+
+model InfluencerTag {
+  influencerId String
+  tagId        String
+  createdAt    DateTime @default(now())
+
+  influencer Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([influencerId, tagId])
+  @@map("influencer_tags")
+}
+
+// ---------------------------------------------------------------------------
+// Campaign audience / outreach queue records
+// ---------------------------------------------------------------------------
+
+model CampaignInfluencer {
+  id             String         @id @default(cuid())
+  campaignId     String
+  influencerId   String
+  assigneeId     String?
+  priority       Int            @default(0)
+  outreachStatus OutreachStatus @default(NOT_CONTACTED)
+  pipelineStatus PipelineStatus @default(NONE)
+  dueAt          DateTime?
+  lastContactAt  DateTime?
+  quotedRate     String?
+  notes          String         @default("")
+  /// Draft message text saved by the operator but not yet confirmed as sent.
+  draftMessage   String?
+
+  /// Optimistic concurrency token (§10 Concurrency, §18 Concurrent record update).
+  version        Int            @default(0)
+  /// Short processing lock so two operators cannot work the same record.
+  lockedById     String?
+  lockedAt       DateTime?
+
+  /// Workflow analytics only — never implies a message was sent (§10).
+  queueOpenedAt      DateTime?
+  lastCopiedAt       DateTime?
+  lastProfileOpenAt  DateTime?
+
+  /// Auditable DNC override (FR-027 / AC-004).
+  dncOverrideById     String?
+  dncOverrideAt       DateTime?
+  dncOverrideReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaign      Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  influencer    Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  assignee      User?      @relation("RecordAssignee", fields: [assigneeId], references: [id])
+  lockedBy      User?      @relation("RecordLock", fields: [lockedById], references: [id])
+  dncOverrideBy User?      @relation("DncOverrideBy", fields: [dncOverrideById], references: [id])
+
+  attempts      OutreachAttempt[]
+  followUpTasks FollowUpTask[]
+  importRows    ImportRow[]
+
+  /// §13 — one record per influencer per campaign.
+  @@unique([campaignId, influencerId])
+  @@index([campaignId, outreachStatus])
+  @@index([assigneeId, outreachStatus])
+  @@index([dueAt])
+  @@map("campaign_influencers")
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+model MessageTemplate {
+  id               String         @id @default(cuid())
+  name             String
+  platform         String         @default("ANY")
+  language         String         @default("en")
+  status           TemplateStatus @default(DRAFT)
+  description      String         @default("")
+  createdById      String
+  currentVersionId String?        @unique
+  archivedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  createdBy      User             @relation("TemplateCreator", fields: [createdById], references: [id])
+  currentVersion TemplateVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+
+  versions TemplateVersion[] @relation("TemplateVersions")
+
+  @@map("message_templates")
+}
+
+model TemplateVersion {
+  id          String         @id @default(cuid())
+  templateId  String
+  version     Int
+  content     String
+  /// Variable tokens discovered in the content plus their required/optional flag.
+  variables   Json
+  /// Variables the campaign manager locked against operator editing (§12).
+  lockedTokens String[]      @default([])
+  status      TemplateStatus @default(DRAFT)
+  versionNote String         @default("")
+  approvedById String?
+  approvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  template   MessageTemplate  @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  approvedBy User?            @relation("VersionApprover", fields: [approvedById], references: [id])
+  currentFor MessageTemplate? @relation("CurrentVersion")
+
+  campaigns Campaign[]
+  attempts  OutreachAttempt[]
+
+  @@unique([templateId, version])
+  @@map("template_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Outreach attempts and follow-ups
+// ---------------------------------------------------------------------------
+
+model OutreachAttempt {
+  id                   String          @id @default(cuid())
+  campaignInfluencerId String
+  type                 AttemptType     @default(FIRST_CONTACT)
+  channel              Platform?
+  templateVersionId    String?
+  /// The message the system rendered and presented to the operator.
+  preparedText         String
+  /// The exact text the operator confirmed they manually sent (AC-007).
+  confirmedSentText    String?
+  outcome              AttemptOutcome
+  skipReasonId         String?
+  note                 String          @default("")
+  /// Operator's explicit "I manually sent this message" acknowledgement (§10).
+  manualSendAffirmed   Boolean         @default(false)
+  /// True when the operator confirmed sending despite unresolved variables (AC / §9).
+  unresolvedAcknowledged Boolean       @default(false)
+  sentConfirmedAt      DateTime?
+  createdById          String
+  createdAt            DateTime        @default(now())
+
+  campaignInfluencer CampaignInfluencer @relation(fields: [campaignInfluencerId], references: [id], onDelete: Cascade)
+  createdBy          User               @relation("AttemptCreator", fields: [createdById], references: [id])
+  templateVersion    TemplateVersion?   @relation(fields: [templateVersionId], references: [id])
+  skipReason         SkipReason?        @relation(fields: [skipReasonId], references: [id])
+
+  followUpTasks FollowUpTask[]
+
+  @@index([campaignInfluencerId])
+  @@index([createdById, createdAt])
+  @@map("outreach_attempts")
+}
+
+model SkipReason {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  attempts OutreachAttempt[]
+
+  @@map("skip_reasons")
+}
+
+model FollowUpTask {
+  id                   String         @id @default(cuid())
+  campaignInfluencerId String
+  attemptId            String?
+  /// 1 = first follow-up, 2 = final follow-up (§13 Follow-up Rules).
+  sequence             Int            @default(1)
+  dueAt                DateTime
+  status               FollowUpStatus @default(PENDING)
+  assignedToId         String?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  cancelReason         String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  campaignInfluencer CampaignInfluencer @relation(fields: [campaignInfluencerId], references: [id], onDelete: Cascade)
+  attempt            OutreachAttempt?   @relation(fields: [attemptId], references: [id])
+  assignedTo         User?              @relation("FollowUpAssignee", fields: [assignedToId], references: [id])
+
+  @@index([status, dueAt])
+  @@index([assignedToId, status])
+  @@map("follow_up_tasks")
+}
+
+// ---------------------------------------------------------------------------
+// Import pipeline
+// ---------------------------------------------------------------------------
+
+model Import {
+  id               String       @id @default(cuid())
+  campaignId       String?
+  originalFileName String
+  storedFileKey    String
+  fileSizeBytes    Int
+  sheetName        String?
+  availableSheets  String[]     @default([])
+  /// Raw header row detected in the source file.
+  headers          String[]     @default([])
+  /// Column mapping: { systemField: sourceHeader | null }.
+  mapping          Json?
+  status           ImportStatus @default(UPLOADED)
+  totalRows        Int          @default(0)
+  validRows        Int          @default(0)
+  warningRows      Int          @default(0)
+  rejectedRows     Int          @default(0)
+  importedRows     Int          @default(0)
+  linkedExisting   Int          @default(0)
+  createdCount     Int          @default(0)
+  errorMessage     String?
+  uploadedById     String
+  committedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  uploadedBy User      @relation("ImportUploader", fields: [uploadedById], references: [id])
+
+  rows ImportRow[]
+
+  @@index([campaignId])
+  @@map("imports")
+}
+
+model ImportRow {
+  id             String          @id @default(cuid())
+  importId       String
+  rowNumber      Int
+  /// Original row values keyed by source header.
+  rawData        Json
+  /// Values after mapping + normalization.
+  normalizedData Json
+  status         ImportRowStatus
+  /// [{ field, code, message, severity }]
+  issues         Json            @default("[]")
+  /// Whether the user selected this row for commit.
+  selected       Boolean         @default(true)
+  influencerId   String?
+  campaignInfluencerId String?
+  createdAt      DateTime        @default(now())
+
+  import             Import              @relation(fields: [importId], references: [id], onDelete: Cascade)
+  campaignInfluencer CampaignInfluencer? @relation(fields: [campaignInfluencerId], references: [id], onDelete: SetNull)
+
+  @@index([importId, status])
+  @@map("import_rows")
+}
+
+// ---------------------------------------------------------------------------
+// Exports, settings and audit
+// ---------------------------------------------------------------------------
+
+model ExportJob {
+  id            String       @id @default(cuid())
+  requestedById String
+  entity        String
+  format        ExportFormat @default(CSV)
+  filters       Json
+  status        ExportStatus @default(PENDING)
+  rowCount      Int          @default(0)
+  storedFileKey String?
+  fileName      String?
+  errorMessage  String?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  requestedBy User @relation("ExportRequester", fields: [requestedById], references: [id])
+
+  @@index([requestedById, status])
+  @@map("export_jobs")
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String?
+  action     String
+  entity     String
+  entityId   String?
+  campaignId String?
+  /// Field-level diff: { field: { from, to } }.
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  sessionId  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+  @@index([campaignId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

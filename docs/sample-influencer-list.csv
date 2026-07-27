@@ -1,0 +1,11 @@
+influencer_name,first_name,instagram_url,facebook_url,preferred_channel,category,location,followers,email,expected_rate,notes,tags
+Maria Santos,Maria,https://www.instagram.com/examplecreator/,https://www.facebook.com/examplecreator,Instagram,Food / Lifestyle,Metro Manila,85000,creator@example.com,"PHP 5,000",Previously posted Korean restaurant content,food;bgc;reels
+Jose Reyes,Jose,https://instagram.com/josereyeseats,,Instagram,Food,BGC Taguig,"120,000",,"PHP 7,000",Strong Reels engagement,food;reels
+Ana Cruz,Ana,https://www.instagram.com/anacruzfamily/,https://m.facebook.com/anacruzfamily,Facebook,Family,Quezon City,45K,ana@example.com,,Family-oriented audience,family
+Paolo Bautista,Paolo,,https://www.facebook.com/profile.php?id=100001234567890,Facebook,Travel,Makati,32000,,,Facebook-first creator,travel
+Bea Ocampo,Bea,https://www.instagram.com/beaocampo/reels/,,Instagram,Beauty,Mandaluyong,1.2M,bea@example.com,"PHP 25,000",Extra path segments are normalized away,beauty
+Miguel Garcia,Miguel,@miguelgarciaeats,,Instagram,Food,Pasig,50k-80k,,,Bare handle and an ambiguous follower range,food
+Camille Mendoza,Camille,https://www.instagram.com/examplecreator/,,Instagram,Food,Metro Manila,85000,,,Exact duplicate of row 2 - imports as a warning,food
+Rafael Torres,Rafael,https://tiktok.com/@rafaeltorres,,Instagram,Gaming,Manila,15000,,,Unsupported domain - this row is rejected,gaming
+Isabel Villanueva,Isabel,,,Email,Lifestyle,Cebu,9000,isabel@example.com,,No social profile - stored in the database but not queued for outreach,lifestyle
+,,,,,,,,,,Empty row - rejected because it has no name and no profile URL,

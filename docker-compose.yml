@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: qroad_ioa_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qroad
+      POSTGRES_PASSWORD: qroad_dev_password
+      POSTGRES_DB: qroad_ioa
+    ports:
+      - "5433:5432"
+    volumes:
+      - qroad_ioa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qroad -d qroad_ioa"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qroad_ioa_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://qroad:qroad_dev_password@db:5432/qroad_ioa?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production-min-32-characters-long}
+      NODE_ENV: production
+      STORAGE_DIR: /data/storage
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      DISCOVERY_SEARCH_COUNTRY: ${DISCOVERY_SEARCH_COUNTRY:-ph}
+    ports:
+      - "3000:3000"
+    volumes:
+      - qroad_ioa_storage:/data/storage
+    profiles: ["full"]
+
+volumes:
+  qroad_ioa_pgdata:
+  qroad_ioa_storage:
