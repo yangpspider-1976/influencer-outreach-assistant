@@ -17,6 +17,8 @@ export type ImportFieldKey =
   | "first_name"
   | "instagram_url"
   | "facebook_url"
+  | "tiktok_url"
+  | "youtube_url"
   | "preferred_channel"
   | "category"
   | "location"
@@ -64,6 +66,28 @@ export const IMPORT_FIELDS: ImportFieldDefinition[] = [
     example: "https://www.facebook.com/examplecreator",
     identity: true,
     aliases: ["facebook", "facebookurl", "fb", "fburl", "fblink", "facebooklink", "facebookprofile", "facebookpage"],
+  },
+  {
+    key: "tiktok_url",
+    label: "TikTok URL",
+    example: "https://www.tiktok.com/@examplecreator",
+    identity: true,
+    aliases: ["tiktok", "tiktokurl", "tt", "tturl", "tiktoklink", "tiktokprofile"],
+  },
+  {
+    key: "youtube_url",
+    label: "YouTube URL",
+    example: "https://www.youtube.com/@examplecreator",
+    identity: true,
+    aliases: [
+      "youtube",
+      "youtubeurl",
+      "yt",
+      "yturl",
+      "youtubelink",
+      "youtubechannel",
+      "youtubeprofile",
+    ],
   },
   {
     key: "preferred_channel",
@@ -225,6 +249,8 @@ function parseChannel(value: string): SocialPlatform | null {
   const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
   if (["instagram", "ig", "insta"].includes(normalized)) return "INSTAGRAM";
   if (["facebook", "fb", "meta", "messenger"].includes(normalized)) return "FACEBOOK";
+  if (["tiktok", "tt"].includes(normalized)) return "TIKTOK";
+  if (["youtube", "yt", "youtubechannel"].includes(normalized)) return "YOUTUBE";
   return null;
 }
 
@@ -246,6 +272,8 @@ export function validateRow(
   const firstNameInput = pick(raw, mapping, "first_name");
   const instagramInput = pick(raw, mapping, "instagram_url");
   const facebookInput = pick(raw, mapping, "facebook_url");
+  const tiktokInput = pick(raw, mapping, "tiktok_url");
+  const youtubeInput = pick(raw, mapping, "youtube_url");
   const channelInput = pick(raw, mapping, "preferred_channel");
   const followersInput = pick(raw, mapping, "followers");
   const emailInput = pick(raw, mapping, "email");
@@ -255,6 +283,8 @@ export function validateRow(
   const platforms: [ImportFieldKey, string, SocialPlatform][] = [
     ["instagram_url", instagramInput, "INSTAGRAM"],
     ["facebook_url", facebookInput, "FACEBOOK"],
+    ["tiktok_url", tiktokInput, "TIKTOK"],
+    ["youtube_url", youtubeInput, "YOUTUBE"],
   ];
 
   for (const [field, input, platform] of platforms) {
@@ -288,7 +318,7 @@ export function validateRow(
     if (seenNormalizedUrls.has(profile.normalizedUrl)) {
       duplicateInFile = true;
       issues.push({
-        field: profile.platform === "INSTAGRAM" ? "instagram_url" : "facebook_url",
+        field: fieldForPlatform(profile.platform),
         code: "DUPLICATE_IN_FILE",
         message: `${profile.normalizedUrl} already appears earlier in this file.`,
         severity: "warning",
@@ -327,8 +357,8 @@ export function validateRow(
       field: "row",
       code: "NO_SOCIAL_PROFILE",
       message: email
-        ? "No Instagram or Facebook profile. The creator can be stored but cannot enter the outreach queue."
-        : "No Instagram or Facebook profile. The creator cannot enter the outreach queue.",
+        ? "No supported social profile. The creator can be stored but cannot enter the outreach queue."
+        : "No supported social profile. The creator cannot enter the outreach queue.",
       severity: "warning",
     });
   }
@@ -412,6 +442,19 @@ export function classify(issues: RowIssue[]): RowClassification {
   if (issues.some((issue) => issue.severity === "error")) return "REJECTED";
   if (issues.some((issue) => issue.severity === "warning")) return "WARNING";
   return "VALID";
+}
+
+function fieldForPlatform(platform: SocialPlatform): ImportFieldKey {
+  switch (platform) {
+    case "INSTAGRAM":
+      return "instagram_url";
+    case "FACEBOOK":
+      return "facebook_url";
+    case "TIKTOK":
+      return "tiktok_url";
+    case "YOUTUBE":
+      return "youtube_url";
+  }
 }
 
 export function deriveFirstName(displayName: string): string | null {

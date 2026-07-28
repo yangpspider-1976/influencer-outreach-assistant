@@ -33,7 +33,7 @@ export default async function DiscoveryPage() {
     <Page>
       <PageHeader
         title="Creator discovery"
-        description="Find public Instagram and Facebook creators with guided browser search or the configured automatic provider, then review each profile before saving it."
+        description="Find public creators on Instagram, Facebook, TikTok, and YouTube with guided browser search or the configured automatic provider, then review each profile before saving it."
         actions={
           <ButtonLink
             href="/influencers"

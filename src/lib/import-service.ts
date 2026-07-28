@@ -12,6 +12,7 @@ import {
   classify,
   validateRow,
 } from "./import-fields";
+import type { SocialPlatform } from "./social-url";
 
 /**
  * §8 — validation pass and transactional commit.
@@ -118,7 +119,14 @@ export async function enrichRows(
       matchedInfluencerId = existing.influencerId;
       matchedInfluencerName = existing.influencer.displayName;
       issues.push({
-        field: profile.platform === "INSTAGRAM" ? "instagram_url" : "facebook_url",
+        field:
+          profile.platform === "INSTAGRAM"
+            ? "instagram_url"
+            : profile.platform === "FACEBOOK"
+              ? "facebook_url"
+              : profile.platform === "TIKTOK"
+                ? "tiktok_url"
+                : "youtube_url",
         code: "LINKED_EXISTING",
         message: `Matched the existing influencer "${existing.influencer.displayName}"; no duplicate will be created.`,
         severity: "info",
@@ -217,9 +225,9 @@ export async function commitImport(
             rate: string | null;
             notes: string;
             tags: string[];
-            preferredChannel: "INSTAGRAM" | "FACEBOOK" | null;
+            preferredChannel: SocialPlatform | null;
             profiles: {
-              platform: "INSTAGRAM" | "FACEBOOK";
+              platform: SocialPlatform;
               originalUrl: string;
               normalizedUrl: string;
               usernameHint: string | null;

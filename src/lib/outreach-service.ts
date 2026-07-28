@@ -20,6 +20,7 @@ import {
   type OutreachStatusKey,
 } from "./status";
 import { planFollowUps, shouldCancelFollowUps } from "./follow-up";
+import type { SocialPlatform } from "./social-url";
 
 /** §10 Concurrency — how long a processing lock is honoured. */
 export const RECORD_LOCK_TTL_MS = 15 * 60 * 1000;
@@ -188,7 +189,7 @@ export type OutcomeInput = {
   outcome: OutcomeKind;
   /** Optimistic concurrency token from the workspace payload (§10, §18). */
   version: number;
-  channel?: "INSTAGRAM" | "FACEBOOK" | null;
+  channel?: SocialPlatform | null;
   /** Exact text the operator confirms they sent (AC-007). */
   confirmedText?: string | null;
   preparedText: string;

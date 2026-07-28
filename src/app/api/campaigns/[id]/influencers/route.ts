@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: Params) {
     if (influencer._count.profiles === 0) {
       throw new ApiError(
         422,
-        "This creator has no saved Instagram or Facebook profile, so they can't be added to a campaign audience.",
+        "This creator has no saved supported social profile, so they can't be added to a campaign audience.",
         "NO_PROFILE",
       );
     }

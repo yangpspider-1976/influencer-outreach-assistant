@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client-api";
 import { formatCompactNumber } from "@/lib/format";
 import type { RoleKeyName } from "@/lib/rbac";
+import { SOCIAL_PLATFORM_LABELS, type SocialPlatform } from "@/lib/social-url";
 import { OUTREACH_STATUSES, STATUS_META } from "@/lib/status";
 import { AddCreatorControl } from "./add-creator-control";
 
@@ -35,7 +36,7 @@ type AudienceRecord = {
     followerCountRaw: string | null;
     followerCountNumeric: number | null;
     dncFlag: boolean;
-    profiles: { platform: string; originalUrl: string; preferredFlag: boolean }[];
+    profiles: { platform: SocialPlatform; originalUrl: string; preferredFlag: boolean }[];
   };
 };
 
@@ -336,7 +337,7 @@ export function AudienceTable({
                       ) : (
                         record.influencer.profiles.map((profile) => (
                           <Badge key={profile.platform} tone="info">
-                            {profile.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                            {SOCIAL_PLATFORM_LABELS[profile.platform]}
                           </Badge>
                         ))
                       )}

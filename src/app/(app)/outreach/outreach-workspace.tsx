@@ -32,6 +32,7 @@ import { Page } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError, copyPlainText, openProfile } from "@/lib/client-api";
 import { formatCompactNumber, formatDate, formatDateTime, relativeTime } from "@/lib/format";
+import { SOCIAL_PLATFORM_LABELS, type SocialPlatform } from "@/lib/social-url";
 import { findUnresolvedTokens } from "@/lib/template";
 import type { WorkspacePayload } from "@/lib/workspace-payload";
 import { cn } from "@/lib/cn";
@@ -63,9 +64,9 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
 
   const [text, setText] = useState(message.text);
   const [note, setNote] = useState(record.notes ?? "");
-  const [channel, setChannel] = useState<"INSTAGRAM" | "FACEBOOK">(
-    (influencer.preferredPlatform as "INSTAGRAM" | "FACEBOOK") ??
-      (influencer.profiles[0]?.platform as "INSTAGRAM" | "FACEBOOK") ??
+  const [channel, setChannel] = useState<SocialPlatform>(
+    (influencer.preferredPlatform as SocialPlatform | null) ??
+      (influencer.profiles[0]?.platform as SocialPlatform | undefined) ??
       "INSTAGRAM",
   );
   const [skipReasonId, setSkipReasonId] = useState(skipReasons[0]?.id ?? "");
@@ -128,7 +129,7 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
     await api.post(`/api/outreach/${record.id}/copy-event`, { kind: "copy" }).catch(() => undefined);
   }
 
-  async function handleOpenProfile(platform: "INSTAGRAM" | "FACEBOOK") {
+  async function handleOpenProfile(platform: SocialPlatform) {
     const profile = influencer.profiles.find((entry) => entry.platform === platform);
     if (!profile) return;
     setChannel(platform);
@@ -206,8 +207,7 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
     }
   }
 
-  const instagram = influencer.profiles.find((entry) => entry.platform === "INSTAGRAM");
-  const facebook = influencer.profiles.find((entry) => entry.platform === "FACEBOOK");
+  const profiles = influencer.profiles;
 
   return (
     <Page width="full" className="max-w-[1600px]">
@@ -371,27 +371,19 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
                   {copied ? "Copied" : "Copy message"}
                 </Button>
 
-                {instagram ? (
+                {profiles.map((profile) => (
                   <Button
+                    key={profile.id}
                     variant="secondary"
-                    onClick={() => handleOpenProfile("INSTAGRAM")}
+                    onClick={() => handleOpenProfile(profile.platform as SocialPlatform)}
                     icon={<ExternalLink className="size-4" aria-hidden />}
                   >
-                    Open Instagram
+                    Open {SOCIAL_PLATFORM_LABELS[profile.platform as SocialPlatform]}
                   </Button>
-                ) : null}
-                {facebook ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleOpenProfile("FACEBOOK")}
-                    icon={<ExternalLink className="size-4" aria-hidden />}
-                  >
-                    Open Facebook
-                  </Button>
-                ) : null}
-                {!instagram && !facebook ? (
+                ))}
+                {profiles.length === 0 ? (
                   <span className="text-[13px] text-rose-600">
-                    No Instagram or Facebook profile is saved for this creator.
+                    No supported social profile is saved for this creator.
                   </span>
                 ) : null}
 
@@ -456,11 +448,14 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
                     id="channel"
                     value={channel}
                     onChange={(value) =>
-                      setChannel(value as "INSTAGRAM" | "FACEBOOK")
+                      setChannel(value as SocialPlatform)
                     }
                   >
-                    {instagram ? <option value="INSTAGRAM">Instagram</option> : null}
-                    {facebook ? <option value="FACEBOOK">Facebook</option> : null}
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.platform}>
+                        {SOCIAL_PLATFORM_LABELS[profile.platform as SocialPlatform]}
+                      </option>
+                    ))}
                   </SelectMenu>
                 </Field>
 
@@ -579,7 +574,7 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
                   <li key={profile.id} className="px-5 py-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-[13px] font-medium text-slate-800">
-                        {profile.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                        {SOCIAL_PLATFORM_LABELS[profile.platform as SocialPlatform]}
                         {profile.preferred ? (
                           <span className="ml-2 text-[11px] font-normal text-brand-600">
                             preferred
@@ -677,7 +672,9 @@ export function OutreachWorkspace({ payload, remaining, upcoming }: Props) {
                     </div>
                     <p className="mt-0.5 text-[12px] text-slate-500">
                       {attempt.createdBy}
-                      {attempt.channel ? ` · ${attempt.channel.toLowerCase()}` : ""}
+                      {attempt.channel
+                        ? ` · ${SOCIAL_PLATFORM_LABELS[attempt.channel as SocialPlatform]}`
+                        : ""}
                       {attempt.skipReason ? ` · ${attempt.skipReason}` : ""}
                     </p>
                     {attempt.note ? (

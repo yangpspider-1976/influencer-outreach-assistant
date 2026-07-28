@@ -101,7 +101,7 @@ describe("normalizeProfileUrl — Facebook", () => {
 
 describe("normalizeProfileUrl — rejections", () => {
   it("rejects unsupported domains", () => {
-    const result = normalizeProfileUrl("https://tiktok.com/@creator");
+    const result = normalizeProfileUrl("https://example.com/@creator");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("UNSUPPORTED_DOMAIN");
   });

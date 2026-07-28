@@ -219,8 +219,8 @@ export function ImportWizard({
                 Drop your file here, or choose one
               </p>
               <p className="mt-1 text-[13px] text-slate-500">
-                Expected columns: influencer_name, instagram_url, facebook_url, category, location,
-                followers, notes, tags.
+                Expected columns: influencer_name, instagram_url, facebook_url, tiktok_url,
+                youtube_url, category, location, followers, notes, tags.
               </p>
               <input
                 ref={fileInput}
@@ -250,8 +250,7 @@ export function ImportWizard({
 
             <Callout tone="info" className="mt-5">
               The uploaded file is stored in private storage and never served publicly. Follower
-              counts are read from your file — this tool never collects them from Instagram or
-              Facebook.
+              counts are read from your file — this tool never collects them from social platforms.
             </Callout>
           </div>
         </Card>

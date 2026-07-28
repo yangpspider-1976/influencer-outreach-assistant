@@ -8,7 +8,16 @@
  * This module is pure: no network access, no DOM, no scraping (§16).
  */
 
-export type SocialPlatform = "INSTAGRAM" | "FACEBOOK";
+export const SOCIAL_PLATFORMS = ["INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE"] as const;
+
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+
+export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  TIKTOK: "TikTok",
+  YOUTUBE: "YouTube",
+};
 
 export type UrlIssueCode =
   | "EMPTY"
@@ -62,6 +71,21 @@ const FACEBOOK_HOSTS = new Set([
   "www.fb.me",
 ]);
 
+const TIKTOK_HOSTS = new Set([
+  "tiktok.com",
+  "www.tiktok.com",
+  "m.tiktok.com",
+]);
+
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+  "www.youtu.be",
+]);
+
 /** Path prefixes that are content, not a profile. */
 const INSTAGRAM_RESERVED = new Set([
   "p",
@@ -101,7 +125,37 @@ const FACEBOOK_RESERVED = new Set([
   "share",
 ]);
 
+const TIKTOK_RESERVED = new Set([
+  "discover",
+  "embed",
+  "foryou",
+  "following",
+  "live",
+  "login",
+  "music",
+  "search",
+  "share",
+  "tag",
+  "t",
+  "upload",
+  "video",
+]);
+
+const YOUTUBE_RESERVED = new Set([
+  "clip",
+  "embed",
+  "feed",
+  "hashtag",
+  "live",
+  "playlist",
+  "post",
+  "results",
+  "shorts",
+  "watch",
+]);
+
 const HANDLE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const YOUTUBE_CHANNEL_ID_PATTERN = /^[A-Za-z0-9_-]{3,128}$/;
 
 function fail(
   code: UrlIssueCode,
@@ -119,6 +173,8 @@ function stripInvisible(value: string): string {
 function detectPlatformFromHost(host: string): SocialPlatform | null {
   if (INSTAGRAM_HOSTS.has(host)) return "INSTAGRAM";
   if (FACEBOOK_HOSTS.has(host)) return "FACEBOOK";
+  if (TIKTOK_HOSTS.has(host)) return "TIKTOK";
+  if (YOUTUBE_HOSTS.has(host)) return "YOUTUBE";
   return null;
 }
 
@@ -161,7 +217,7 @@ export function normalizeProfileUrl(
       );
     }
     warnings.push("A bare handle was supplied; the full profile URL was reconstructed.");
-    return buildResult(expectedPlatform, originalUrl, handle.toLowerCase(), warnings);
+    return buildBareHandleResult(expectedPlatform, originalUrl, handle, warnings);
   }
 
   const working = /^https?:\/\//i.test(originalUrl) ? originalUrl : `https://${originalUrl}`;
@@ -185,7 +241,7 @@ export function normalizeProfileUrl(
   if (!platform) {
     return fail(
       "UNSUPPORTED_DOMAIN",
-      `"${host}" is not a supported Instagram or Facebook domain.`,
+      `"${host}" is not a supported Instagram, Facebook, TikTok or YouTube domain.`,
     );
   }
   if (expectedPlatform && platform !== expectedPlatform) {
@@ -235,6 +291,95 @@ export function normalizeProfileUrl(
     }
   }
 
+  if (platform === "TIKTOK") {
+    const first = segments[0] ?? "";
+    const lowerFirst = first.toLowerCase();
+    if (lowerFirst && TIKTOK_RESERVED.has(lowerFirst)) {
+      return fail(
+        "NOT_A_PROFILE_URL",
+        `"${originalUrl}" points to TikTok content, not a profile.`,
+        true,
+      );
+    }
+    if (!first.startsWith("@")) {
+      return fail(
+        "NOT_A_PROFILE_URL",
+        `"${originalUrl}" is not a direct TikTok creator profile link.`,
+        true,
+      );
+    }
+    const handle = first.slice(1);
+    if (!HANDLE_PATTERN.test(handle)) {
+      return fail("MALFORMED", `"${first}" is not a valid TikTok profile name.`);
+    }
+    if (segments.length > 1) {
+      warnings.push("Extra path segments were removed to reach the profile root.");
+    }
+    return buildResult(platform, originalUrl, `@${handle.toLowerCase()}`, warnings, handle);
+  }
+
+  if (platform === "YOUTUBE") {
+    if (host === "youtu.be" || host === "www.youtu.be") {
+      return fail(
+        "NOT_A_PROFILE_URL",
+        `"${originalUrl}" points to a YouTube video, not a creator channel.`,
+        true,
+      );
+    }
+
+    const first = segments[0] ?? "";
+    const lowerFirst = first.toLowerCase();
+    if (lowerFirst && YOUTUBE_RESERVED.has(lowerFirst)) {
+      return fail(
+        "NOT_A_PROFILE_URL",
+        `"${originalUrl}" points to YouTube content, not a creator channel.`,
+        true,
+      );
+    }
+    if (first.startsWith("@")) {
+      const handle = first.slice(1);
+      if (!HANDLE_PATTERN.test(handle)) {
+        return fail("MALFORMED", `"${first}" is not a valid YouTube handle.`);
+      }
+      if (segments.length > 1) {
+        warnings.push("Extra path segments were removed to reach the channel root.");
+      }
+      return buildResult(platform, originalUrl, `@${handle.toLowerCase()}`, warnings, handle);
+    }
+    if (lowerFirst === "channel") {
+      const id = segments[1] ?? "";
+      if (YOUTUBE_CHANNEL_ID_PATTERN.test(id)) {
+        if (segments.length > 2) {
+          warnings.push("Extra path segments were removed to reach the channel root.");
+        }
+        return buildResult(platform, originalUrl, `channel/${id}`, warnings, id);
+      }
+      return fail("NOT_A_PROFILE_URL", `"${originalUrl}" has no usable YouTube channel id.`);
+    }
+    if (lowerFirst === "c" || lowerFirst === "user") {
+      const slug = segments[1] ?? "";
+      if (HANDLE_PATTERN.test(slug)) {
+        if (segments.length > 2) {
+          warnings.push("Extra path segments were removed to reach the channel root.");
+        }
+        return buildResult(
+          platform,
+          originalUrl,
+          `${lowerFirst}/${slug.toLowerCase()}`,
+          warnings,
+          slug,
+        );
+      }
+      return fail("NOT_A_PROFILE_URL", `"${originalUrl}" has no usable YouTube channel name.`);
+    }
+
+    return fail(
+      "NOT_A_PROFILE_URL",
+      `"${originalUrl}" is not a direct YouTube creator channel link.`,
+      true,
+    );
+  }
+
   if (segments.length === 0) {
     return fail("NOT_A_PROFILE_URL", `"${originalUrl}" has no profile name in the path.`);
   }
@@ -266,7 +411,7 @@ function buildResult(
   warnings: string[],
   usernameHint?: string | null,
 ): NormalizedProfile {
-  const domain = platform === "INSTAGRAM" ? "instagram.com" : "facebook.com";
+  const domain = platformDomain(platform);
   return {
     ok: true,
     platform,
@@ -276,6 +421,32 @@ function buildResult(
     usernameHint: usernameHint ?? pathKey,
     warnings,
   };
+}
+
+function buildBareHandleResult(
+  platform: SocialPlatform,
+  originalUrl: string,
+  handle: string,
+  warnings: string[],
+): NormalizedProfile {
+  const pathKey =
+    platform === "TIKTOK" || platform === "YOUTUBE"
+      ? `@${handle.toLowerCase()}`
+      : handle.toLowerCase();
+  return buildResult(platform, originalUrl, pathKey, warnings, handle);
+}
+
+function platformDomain(platform: SocialPlatform): string {
+  switch (platform) {
+    case "INSTAGRAM":
+      return "instagram.com";
+    case "FACEBOOK":
+      return "facebook.com";
+    case "TIKTOK":
+      return "tiktok.com";
+    case "YOUTUBE":
+      return "youtube.com";
+  }
 }
 
 /**

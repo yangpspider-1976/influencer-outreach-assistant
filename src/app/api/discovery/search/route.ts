@@ -6,7 +6,7 @@ import { searchCreatorProfiles } from "@/lib/discovery-provider";
 import { canUseCreatorDiscovery, has } from "@/lib/rbac";
 import { discoverySearchSchema } from "@/lib/validation";
 
-/** Search public web-index results for reviewable Instagram/Facebook profile URLs. */
+/** Search public web-index results for reviewable social profile URLs. */
 export async function POST(request: Request) {
   try {
     const user = await requireUser();

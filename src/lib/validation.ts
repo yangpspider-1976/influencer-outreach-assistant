@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { OUTREACH_STATUSES, PIPELINE_LANES } from "./status";
+import { SOCIAL_PLATFORMS } from "./social-url";
+
+const TEMPLATE_PLATFORMS = ["ANY", ...SOCIAL_PLATFORMS] as const;
 
 /** §7 Campaign Configuration Requirements. */
 export const campaignInputSchema = z
@@ -42,7 +45,7 @@ export const loginSchema = z.object({
 
 export const templateInputSchema = z.object({
   name: z.string().trim().min(3).max(150),
-  platform: z.enum(["ANY", "INSTAGRAM", "FACEBOOK"]).default("ANY"),
+  platform: z.enum(TEMPLATE_PLATFORMS).default("ANY"),
   language: z.string().trim().min(2).max(10).default("en"),
   description: z.string().trim().max(500).default(""),
   content: z.string().trim().min(20, "A template needs at least 20 characters."),
@@ -53,7 +56,7 @@ export const templateInputSchema = z.object({
 export const outcomeSchema = z.object({
   outcome: z.enum(["SENT", "SKIPPED", "INVALID", "DUPLICATE", "DO_NOT_CONTACT", "SAVED_FOR_LATER"]),
   version: z.number().int().min(0),
-  channel: z.enum(["INSTAGRAM", "FACEBOOK"]).nullable().optional(),
+  channel: z.enum(SOCIAL_PLATFORMS).nullable().optional(),
   confirmedText: z.string().max(20000).nullable().optional(),
   preparedText: z.string().max(20000),
   skipReasonId: z.string().nullable().optional(),
@@ -97,21 +100,22 @@ export const influencerUpdateSchema = z.object({
   notes: z.string().trim().max(4000).optional(),
 });
 
-export const discoverySearchSchema = z
-  .object({
-    keywords: z.string().trim().max(200).default(""),
-    categories: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
-    locations: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
-    channels: z
-      .array(z.enum(["INSTAGRAM", "FACEBOOK"]))
-      .min(1, "Select at least one channel.")
-      .max(2),
-    limit: z.number().int().min(1).max(20).default(10),
-  })
-  .refine((value) => value.keywords || value.categories.length > 0 || value.locations.length > 0, {
-    message: "Add keywords, a category, or a location to search.",
-    path: ["keywords"],
-  });
+export const discoverySearchSchema = z.object({
+  keywords: z.string().trim().max(200).default(""),
+  categories: z
+    .array(z.string().trim().min(1).max(100))
+    .min(1, "Select at least one category.")
+    .max(20),
+  locations: z
+    .array(z.string().trim().min(1).max(100))
+    .min(1, "Select at least one location.")
+    .max(20),
+  channels: z
+    .array(z.enum(SOCIAL_PLATFORMS))
+    .min(1, "Select at least one channel.")
+    .max(SOCIAL_PLATFORMS.length),
+  limit: z.number().int().min(1).max(20).default(10),
+});
 
 export type DiscoverySearchInput = z.infer<typeof discoverySearchSchema>;
 
@@ -121,7 +125,7 @@ export const discoverySaveSchema = z.object({
   profiles: z
     .array(
       z.object({
-        platform: z.enum(["INSTAGRAM", "FACEBOOK"]),
+        platform: z.enum(SOCIAL_PLATFORMS),
         profileUrl: z.string().trim().url().max(500),
         displayName: z.string().trim().min(1).max(200),
       }),

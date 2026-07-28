@@ -28,7 +28,7 @@ type ProfileValues = {
 /**
  * The read-only profile card plus an inline editor. Details entered here come
  * from the operator's own records — the app never collects follower or contact
- * data from Instagram or Facebook (§15 / SEC-007), so there is nothing to fetch
+ * data from social platforms (§15 / SEC-007), so there is nothing to fetch
  * automatically; the form simply makes the fields editable in one place.
  */
 export function ProfilePanel({
@@ -89,7 +89,7 @@ export function ProfilePanel({
       <Card>
         <CardHeader
           title="Edit profile"
-          description="Details you record come from your own lists — nothing is collected from Instagram or Facebook."
+          description="Details you record come from your own lists — nothing is collected from social platforms."
         />
         <div className="space-y-4 p-5">
           <Field label="Display name" htmlFor="edit-displayName">

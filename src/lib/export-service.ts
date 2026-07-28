@@ -115,6 +115,16 @@ const CAMPAIGN_RECORD_COLUMNS: ExportColumn<CampaignRecordRow>[] = [
     header: "Facebook URL",
     value: (r) => r.influencer.profiles.find((p) => p.platform === "FACEBOOK")?.originalUrl ?? "",
   },
+  {
+    key: "tiktok",
+    header: "TikTok URL",
+    value: (r) => r.influencer.profiles.find((p) => p.platform === "TIKTOK")?.originalUrl ?? "",
+  },
+  {
+    key: "youtube",
+    header: "YouTube URL",
+    value: (r) => r.influencer.profiles.find((p) => p.platform === "YOUTUBE")?.originalUrl ?? "",
+  },
   { key: "category", header: "Category", value: (r) => r.influencer.category },
   { key: "location", header: "Location", value: (r) => r.influencer.location },
   { key: "followers", header: "Followers (supplied)", value: (r) => r.influencer.followerCountRaw ?? "" },
@@ -155,6 +165,16 @@ const INFLUENCER_COLUMNS: ExportColumn<InfluencerRow>[] = [
     key: "facebook_url",
     header: "Facebook URL",
     value: (r) => r.profiles.find((p) => p.platform === "FACEBOOK")?.originalUrl ?? "",
+  },
+  {
+    key: "tiktok_url",
+    header: "TikTok URL",
+    value: (r) => r.profiles.find((p) => p.platform === "TIKTOK")?.originalUrl ?? "",
+  },
+  {
+    key: "youtube_url",
+    header: "YouTube URL",
+    value: (r) => r.profiles.find((p) => p.platform === "YOUTUBE")?.originalUrl ?? "",
   },
   {
     key: "preferred_channel",

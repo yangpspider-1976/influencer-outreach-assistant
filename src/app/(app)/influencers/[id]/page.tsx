@@ -6,6 +6,7 @@ import { requirePageUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { has } from "@/lib/rbac";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { SOCIAL_PLATFORM_LABELS } from "@/lib/social-url";
 import { Page } from "@/components/ui/page";
 import {
   Badge,
@@ -201,7 +202,7 @@ export default async function InfluencerDetailPage({
                   <li key={profile.id} className="px-5 py-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-[13px] font-medium text-slate-800">
-                        {profile.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                        {SOCIAL_PLATFORM_LABELS[profile.platform]}
                         {profile.preferredFlag ? (
                           <span className="ml-2 text-[11px] font-normal text-brand-600">
                             preferred

@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input, SelectMenu } from "@/components/ui/form";
+import { SOCIAL_PLATFORM_LABELS, SOCIAL_PLATFORMS } from "@/lib/social-url";
 
 export function InfluencerFilters({ categories }: { categories: string[] }) {
   const router = useRouter();
@@ -55,8 +56,11 @@ export function InfluencerFilters({ categories }: { categories: string[] }) {
         onChange={(value) => update("channel", value)}
       >
         <option value="">All channels</option>
-        <option value="INSTAGRAM">Instagram</option>
-        <option value="FACEBOOK">Facebook</option>
+        {SOCIAL_PLATFORMS.map((platform) => (
+          <option key={platform} value={platform}>
+            {SOCIAL_PLATFORM_LABELS[platform]}
+          </option>
+        ))}
       </SelectMenu>
 
       <SelectMenu

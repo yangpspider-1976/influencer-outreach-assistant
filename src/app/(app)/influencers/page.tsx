@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { has } from "@/lib/rbac";
 import { formatCompactNumber } from "@/lib/format";
+import { SOCIAL_PLATFORM_LABELS } from "@/lib/social-url";
 import { Page } from "@/components/ui/page";
 import {
   Badge,
@@ -106,7 +107,7 @@ export default async function InfluencersPage({
     <Page>
       <PageHeader
         title="Influencer database"
-        description="Every creator QROAD has worked with or imported. Follower counts come from your own lists — nothing is collected from Instagram or Facebook."
+        description="Every creator QROAD has worked with or imported. Follower counts come from your own lists — nothing is collected from social platforms."
         actions={
           has(user.permissions, "export_data") ? (
             <ExportButton entity="influencers" filters={{ search: params.search ?? null }} />
@@ -207,7 +208,7 @@ export default async function InfluencersPage({
                               rel="noopener noreferrer"
                               className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 ring-1 ring-inset ring-brand-200 transition-colors hover:bg-brand-100"
                             >
-                              {profile.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                              {SOCIAL_PLATFORM_LABELS[profile.platform]}
                             </a>
                           ))
                         )}

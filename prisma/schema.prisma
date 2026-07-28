@@ -46,6 +46,8 @@ enum CampaignStatus {
 enum Platform {
   INSTAGRAM
   FACEBOOK
+  TIKTOK
+  YOUTUBE
 }
 
 enum ProfileValidity {

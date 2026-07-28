@@ -8,6 +8,7 @@ import { Card, CardHeader, Callout, Badge } from "@/components/ui/primitives";
 import { Field, FormError, Input, SelectMenu, Textarea } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client-api";
+import { SOCIAL_PLATFORM_LABELS, SOCIAL_PLATFORMS } from "@/lib/social-url";
 import {
   DEFAULT_TEMPLATE_CONTENT,
   VARIABLE_CATALOG,
@@ -147,8 +148,11 @@ export function TemplateEditor({
                 onChange={(value) => setPlatform(value)}
               >
                 <option value="ANY">Any platform</option>
-                <option value="INSTAGRAM">Instagram</option>
-                <option value="FACEBOOK">Facebook</option>
+                {SOCIAL_PLATFORMS.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {SOCIAL_PLATFORM_LABELS[entry]}
+                  </option>
+                ))}
               </SelectMenu>
             </Field>
             <Field label="Language" htmlFor="language">
