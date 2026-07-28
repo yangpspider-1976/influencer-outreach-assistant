@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Info } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const CONTROL =
@@ -24,6 +24,7 @@ export function Field({
   children,
   className,
   htmlFor,
+  labelAccessory,
 }: {
   label: ReactNode;
   hint?: ReactNode;
@@ -32,20 +33,24 @@ export function Field({
   children: ReactNode;
   className?: string;
   htmlFor?: string;
+  labelAccessory?: ReactNode;
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <label
-        htmlFor={htmlFor}
-        className="mb-1.5 flex items-center gap-1 text-[13px] font-medium text-slate-700"
-      >
-        {label}
-        {required ? (
-          <span className="text-rose-500" aria-hidden>
-            *
-          </span>
-        ) : null}
-      </label>
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <label
+          htmlFor={htmlFor}
+          className="flex items-center gap-1 text-[13px] font-medium text-slate-700"
+        >
+          {label}
+          {required ? (
+            <span className="text-rose-500" aria-hidden>
+              *
+            </span>
+          ) : null}
+        </label>
+        {labelAccessory}
+      </div>
       {children}
       {error ? (
         <p className="mt-1.5 text-[12px] font-medium text-rose-600">{error}</p>
@@ -53,6 +58,36 @@ export function Field({
         <p className="mt-1.5 text-[12px] leading-5 text-slate-500">{hint}</p>
       ) : null}
     </div>
+  );
+}
+
+export function InfoTooltip({
+  children,
+  label = "More information",
+}: {
+  children: ReactNode;
+  label?: string;
+}) {
+  const tooltipId = useId();
+
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={tooltipId}
+        className="inline-flex size-4 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+      >
+        <Info className="size-3.5" aria-hidden />
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none invisible absolute bottom-full left-1/2 z-30 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-left text-[12px] font-normal leading-5 text-white opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+      >
+        {children}
+      </span>
+    </span>
   );
 }
 

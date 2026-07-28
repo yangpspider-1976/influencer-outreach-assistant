@@ -40,6 +40,58 @@ describe("creator discovery", () => {
     expect(query).toContain("(site:instagram.com)");
   });
 
+  it("supports TikTok and YouTube in generated discovery queries", () => {
+    const query = buildDiscoveryQuery({
+      keywords: "gaming streamer",
+      categories: ["Gaming"],
+      locations: ["Metro Manila"],
+      channels: ["TIKTOK", "YOUTUBE"],
+      limit: 10,
+    });
+
+    expect(query).toContain("site:tiktok.com OR site:youtube.com");
+
+    const searches = buildDiscoverySearchQueries({
+      keywords: "gaming streamer",
+      categories: ["Gaming"],
+      locations: ["Metro Manila"],
+      channels: ["TIKTOK", "YOUTUBE"],
+      limit: 10,
+    });
+    expect(searches[0]).toContain("(site:tiktok.com/@)");
+    expect(searches[0]).toContain("-inurl:/video/");
+    expect(searches[1]).toContain("site:youtube.com/@");
+    expect(searches[1]).toContain("-inurl:/shorts/");
+  });
+
+  it("targets importable profile paths and broadens all of Metro Manila", () => {
+    const youtubeQueries = buildDiscoverySearchQueries({
+      keywords: "",
+      categories: ["Food"],
+      locations: ["Metro Manila"],
+      channels: ["YOUTUBE"],
+      limit: 5,
+    });
+
+    expect(youtubeQueries).toHaveLength(12);
+    expect(youtubeQueries[0]).toContain('(YouTuber OR "YouTube creator" OR vlogger)');
+    expect(youtubeQueries[0]).toContain("site:youtube.com/@");
+    expect(youtubeQueries[0]).toContain("site:youtube.com/channel/");
+    expect(youtubeQueries.some((query) => query.includes('"Quezon City"'))).toBe(true);
+    expect(youtubeQueries.some((query) => query.includes("Muntinlupa"))).toBe(true);
+    expect(youtubeQueries.some((query) => query.includes("Valenzuela"))).toBe(true);
+
+    const tiktokQueries = buildDiscoverySearchQueries({
+      keywords: "",
+      categories: ["Beauty"],
+      locations: ["Metro Manila"],
+      channels: ["TIKTOK"],
+      limit: 5,
+    });
+    expect(tiktokQueries[0]).toContain('("TikTok creator" OR TikToker OR influencer)');
+    expect(tiktokQueries[0]).toContain("site:tiktok.com/@");
+  });
+
   it("fans automatic discovery into focused channel/category/location queries", () => {
     const queries = buildDiscoverySearchQueries({
       keywords: "",
@@ -50,13 +102,13 @@ describe("creator discovery", () => {
     });
 
     expect(queries).toHaveLength(12);
-    expect(queries[0]).toContain("Pets creator influencer");
+    expect(queries[0]).toContain('Pets ("Instagram creator" OR influencer OR blogger)');
     expect(queries[0]).toContain('"Metro Manila"');
     expect(queries[0]).toContain("(site:instagram.com)");
     expect(queries[0]).toContain("-inurl:/reel/");
     expect(queries[1]).toContain("(site:facebook.com)");
     expect(queries[1]).toContain("-inurl:/watch/");
-    expect(queries[6]).toContain("Food creator influencer");
+    expect(queries[6]).toContain('Food ("Instagram creator" OR influencer OR blogger)');
     expect(queries[8]).toContain("(pets OR dog OR cat OR pet)");
   });
 
@@ -106,9 +158,10 @@ describe("creator discovery", () => {
     });
 
     expect(queries).toHaveLength(12);
-    expect(queries[0]).toContain("Gaming creator influencer");
+    expect(queries[0]).toContain('Gaming ("Instagram creator" OR influencer OR blogger)');
     expect(queries[0]).toContain('"Metro Manila"');
-    expect(queries[2]).toContain('"Manila Philippines"');
+    expect(queries[0]).toContain('"Manila Philippines"');
+    expect(queries[6]).toContain('"Quezon City"');
     expect(queries.some((query) => query.includes("(gaming OR gamer OR streamer OR esports)"))).toBe(true);
     expect(queries.some((query) => query.includes('"Mobile Legends"'))).toBe(true);
     expect(queries.some((query) => query.includes('"game streamer"'))).toBe(true);
@@ -228,18 +281,52 @@ describe("creator discovery", () => {
     });
   });
 
-  it("enforces at least one search parameter, one channel, and a 20-result maximum", () => {
-    // No keywords, categories, or locations — nothing to target.
+  it("keeps TikTok and YouTube profile results while rejecting content URLs", () => {
+    const results = normalizeDiscoveryResults(
+      [
+        {
+          title: "Manila Gaming Creator | TikTok",
+          url: "https://www.tiktok.com/@ManilaGamer/video/123",
+          description: "Mobile Legends streamer in Manila.",
+        },
+        {
+          title: "A short, not a channel",
+          url: "https://www.youtube.com/shorts/abc123",
+        },
+        {
+          title: "Creator Channel - YouTube",
+          url: "https://www.youtube.com/@CreatorChannel/videos",
+        },
+      ],
+      ["TIKTOK", "YOUTUBE"],
+      20,
+    );
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      platform: "TIKTOK",
+      normalizedUrl: "tiktok.com/@manilagamer",
+      profileUrl: "https://www.tiktok.com/@manilagamer",
+    });
+    expect(results[1]).toMatchObject({
+      platform: "YOUTUBE",
+      normalizedUrl: "youtube.com/@creatorchannel",
+      profileUrl: "https://www.youtube.com/@creatorchannel",
+    });
+  });
+
+  it("requires category, location, and channel and enforces the 20-result maximum", () => {
+    // Category and location are both required, even when keywords are present.
     expect(
       discoverySearchSchema.safeParse({
-        keywords: "",
+        keywords: "food",
         categories: [],
         locations: [],
         channels: ["INSTAGRAM"],
         limit: 10,
       }).success,
     ).toBe(false);
-    // A category alone is enough (keywords are optional).
+    // A category without a location is not enough.
     expect(
       discoverySearchSchema.safeParse({
         keywords: "",
@@ -248,13 +335,33 @@ describe("creator discovery", () => {
         channels: ["INSTAGRAM"],
         limit: 10,
       }).success,
+    ).toBe(false);
+    // A location without a category is not enough.
+    expect(
+      discoverySearchSchema.safeParse({
+        keywords: "",
+        categories: [],
+        locations: ["Metro Manila"],
+        channels: ["INSTAGRAM"],
+        limit: 10,
+      }).success,
+    ).toBe(false);
+    // Category and location together are valid without optional keywords.
+    expect(
+      discoverySearchSchema.safeParse({
+        keywords: "",
+        categories: ["Food"],
+        locations: ["Metro Manila"],
+        channels: ["INSTAGRAM"],
+        limit: 10,
+      }).success,
     ).toBe(true);
     // No channel selected.
     expect(
       discoverySearchSchema.safeParse({
         keywords: "food",
-        categories: [],
-        locations: [],
+        categories: ["Food"],
+        locations: ["Metro Manila"],
         channels: [],
         limit: 10,
       }).success,
@@ -263,8 +370,8 @@ describe("creator discovery", () => {
     expect(
       discoverySearchSchema.safeParse({
         keywords: "food",
-        categories: [],
-        locations: [],
+        categories: ["Food"],
+        locations: ["Metro Manila"],
         channels: ["INSTAGRAM"],
         limit: 21,
       }).success,

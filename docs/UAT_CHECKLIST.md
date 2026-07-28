@@ -104,9 +104,10 @@ Run this in staging with realistic data before sign-off. Sign in as the role nam
 - [ ] Create a campaign with all required fields; confirm an end date before the start date is refused
 - [ ] Try to activate before selecting an approved template; confirm the blocker is explained
 - [ ] Approve a template, select it, activate the campaign
-- [ ] Import `docs/sample-influencer-list.csv`; confirm the classification of all 10 rows:
-      valid rows import, the duplicate is pre-deselected, the TikTok row is rejected, the empty row
-      is rejected, and the email-only creator is stored but not queued
+- [ ] Import `docs/sample-influencer-list.csv`; confirm the classification of all 12 rows:
+      valid rows import, the TikTok and YouTube rows are accepted, the duplicate is
+      pre-deselected, the unsupported-domain row and empty row are rejected, and the email-only
+      creator is stored but not queued
 - [ ] Download the validation error file before committing
 - [ ] Commit; confirm the counts (imported / new / linked / added to campaign)
 - [ ] Assign records to two operators and mark them Ready

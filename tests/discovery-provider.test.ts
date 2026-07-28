@@ -144,6 +144,127 @@ describe("searchCreatorProfiles", () => {
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>)["X-API-KEY"]).toBe("serper");
     expect(String(init.body)).toContain("site:instagram.com");
+    expect(JSON.parse(String(init.body))).toMatchObject({ num: 10 });
+  });
+
+  it("continues focused YouTube searches until the requested number of channels is found", async () => {
+    envState.env.serperApiKey = "serper";
+    let requestIndex = 0;
+    const fetchMock = vi.fn<FetchMock>(async (_url, init) => {
+      requestIndex += 1;
+      const body = JSON.parse(String(init.body)) as { q: string; num: number };
+      expect(body.q).toContain("site:youtube.com/@");
+      expect(body.q).toContain("site:youtube.com/channel/");
+      expect(body.num).toBe(10);
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          organic: [
+            {
+              title: `Metro Manila Food Creator ${requestIndex}`,
+              link: `https://www.youtube.com/@manilafood${requestIndex}`,
+              snippet: "Filipino food, restaurant reviews, recipes, and cooking videos.",
+            },
+            {
+              title: "A food video, not a channel",
+              link: `https://www.youtube.com/watch?v=food${requestIndex}`,
+              snippet: "Food in Manila.",
+            },
+          ],
+        }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchCreatorProfiles({
+      keywords: "",
+      categories: ["Food"],
+      locations: ["Metro Manila"],
+      channels: ["YOUTUBE"],
+      limit: 5,
+    });
+
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes("google.serper.dev")),
+    ).toHaveLength(5);
+    expect(result.results).toHaveLength(5);
+    expect(result.results.every((profile) => profile.platform === "YOUTUBE")).toBe(true);
+  });
+
+  it("resolves relevant YouTube video results to their creator channels through oEmbed", async () => {
+    envState.env.serperApiKey = "serper";
+    const fetchMock = vi.fn<FetchMock>(async (url) => {
+      if (String(url).includes("youtube.com/oembed")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            author_name: "Maria Eats",
+            author_url: "https://www.youtube.com/@MariaEatsPH",
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          organic: [
+            {
+              title: "Metro Manila Filipino Food Tour",
+              link: "https://www.youtube.com/watch?v=food123",
+              snippet: "Restaurant reviews, recipes, and Filipino cooking videos.",
+            },
+          ],
+        }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await searchCreatorProfiles({
+      keywords: "",
+      categories: ["Food"],
+      locations: ["Metro Manila"],
+      channels: ["YOUTUBE"],
+      limit: 1,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.results).toEqual([
+      expect.objectContaining({
+        platform: "YOUTUBE",
+        displayName: "Maria Eats",
+        normalizedUrl: "youtube.com/@mariaeatsph",
+        profileUrl: "https://www.youtube.com/@mariaeatsph",
+      }),
+    ]);
+  });
+
+  it("surfaces Serper's actual rejection reason", async () => {
+    envState.env.serperApiKey = "serper";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<FetchMock>(async () => ({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: "Query pattern not allowed for free accounts." }),
+      })),
+    );
+
+    await expect(
+      searchCreatorProfiles({
+        keywords: "",
+        categories: ["Gaming"],
+        locations: ["Metro Manila"],
+        channels: ["YOUTUBE"],
+        limit: 5,
+      }),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "DISCOVERY_PROVIDER_ERROR",
+      message: "Serper rejected the search: Query pattern not allowed for free accounts.",
+    });
   });
 
   it("merges focused Serper searches across selected channels and categories", async () => {

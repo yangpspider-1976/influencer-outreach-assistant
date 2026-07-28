@@ -13,10 +13,11 @@ import type { DiscoverySearchInput } from "./validation";
 /**
  * Creator discovery web-search providers.
  *
- * Discovery finds *public* Instagram/Facebook profile URLs through a general web
+ * Discovery finds *public* social profile URLs through a general web
  * search engine, then hands them to the operator to review before saving. It
- * never contacts Instagram/Facebook directly, never scrapes a profile, and never
- * collects follower or contact data (§16 / Known Limitations).
+ * never scrapes a profile and never collects follower or contact data. When a
+ * web index returns a YouTube video instead of its channel, the public YouTube
+ * oEmbed endpoint is used only to resolve the creator name and channel URL.
  *
  * Three backends are supported, all free-tier and all returning search-index
  * results (not scraped profiles):
@@ -39,6 +40,11 @@ type Backend = {
   run(query: string, input: DiscoverySearchInput): Promise<WebSearchResult[]>;
 };
 
+type YouTubeOEmbedPayload = {
+  author_name?: unknown;
+  author_url?: unknown;
+};
+
 async function fetchProvider(url: URL, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(15_000) });
@@ -51,15 +57,83 @@ async function fetchProvider(url: URL, init: RequestInit): Promise<Response> {
   }
 }
 
+function isYouTubeContentUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (host === "youtu.be" || host === "www.youtu.be") return true;
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) return false;
+    const firstSegment = url.pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+    return (
+      firstSegment === "watch" ||
+      firstSegment === "shorts" ||
+      firstSegment === "live" ||
+      url.searchParams.has("v")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Google commonly ranks relevant YouTube videos instead of their channel pages.
+ * Resolve those hits through YouTube's public oEmbed metadata so discovery can
+ * still return a reviewable channel URL. Failures are intentionally non-fatal:
+ * the original content URL will be discarded by normal profile validation.
+ */
+async function resolveYouTubeChannelResult(
+  result: WebSearchResult,
+): Promise<WebSearchResult> {
+  if (!isYouTubeContentUrl(result.url)) return result;
+
+  const endpoint = new URL("https://www.youtube.com/oembed");
+  endpoint.searchParams.set("url", result.url!);
+  endpoint.searchParams.set("format", "json");
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return result;
+
+    const payload = (await response.json()) as YouTubeOEmbedPayload;
+    const authorUrl = typeof payload.author_url === "string" ? payload.author_url.trim() : "";
+    if (!authorUrl) return result;
+
+    const authorName =
+      typeof payload.author_name === "string" ? payload.author_name.trim() : "";
+    return {
+      title: authorName || result.title,
+      url: authorUrl,
+      description: [result.title, result.description].filter(Boolean).join(". "),
+    };
+  } catch {
+    return result;
+  }
+}
+
+async function resolveSocialProfileResults(
+  results: WebSearchResult[],
+  channels: DiscoverySearchInput["channels"],
+): Promise<WebSearchResult[]> {
+  if (!channels.includes("YOUTUBE")) return results;
+  return Promise.all(results.map(resolveYouTubeChannelResult));
+}
+
 // ---------------------------------------------------------------------------
 // Serper (Google Search API)
 // ---------------------------------------------------------------------------
+
+const SERPER_FREE_RESULT_BATCH_SIZE = 10;
 
 const serperBackend: Backend = {
   id: "serper",
   label: "Serper (Google Search)",
   isConfigured: () => Boolean(env.serperApiKey),
-  async run(query, input) {
+  async run(query) {
     const url = new URL("https://google.serper.dev/search");
     const response = await fetchProvider(url, {
       method: "POST",
@@ -72,8 +146,10 @@ const serperBackend: Backend = {
         q: query,
         gl: env.discoverySearchCountry,
         hl: "en",
-        // Serper returns 10 organic results by default; ask for the batch we need.
-        num: Math.min(Math.max(input.limit, 10), 100),
+        // Serper free accounts reject larger batches with "Query pattern not
+        // allowed". Focused searches accumulate and de-duplicate these batches
+        // until the user's requested profile limit is reached.
+        num: SERPER_FREE_RESULT_BATCH_SIZE,
       }),
     });
     if (response.status === 429) {
@@ -84,9 +160,18 @@ const serperBackend: Backend = {
       );
     }
     if (!response.ok) {
+      let providerMessage = "";
+      try {
+        const payload = (await response.json()) as { message?: unknown };
+        providerMessage = typeof payload.message === "string" ? payload.message.trim() : "";
+      } catch {
+        // Keep the stable fallback when the provider returns a non-JSON error.
+      }
       throw new ApiError(
         502,
-        "Serper rejected the request. Check SERPER_API_KEY and that free credits remain.",
+        providerMessage
+          ? `Serper rejected the search: ${providerMessage}`
+          : "Serper rejected the search request. Try again or check the provider configuration.",
         "DISCOVERY_PROVIDER_ERROR",
       );
     }
@@ -168,7 +253,9 @@ const braveBackend: Backend = {
   async run(query, input) {
     const url = new URL("https://api.search.brave.com/res/v1/web/search");
     url.searchParams.set("q", query);
-    url.searchParams.set("count", String(input.limit));
+    // Like Serper, fetch a larger candidate pool without changing the number of
+    // validated profiles ultimately returned to the user.
+    url.searchParams.set("count", String(Math.min(Math.max(input.limit, 20), 20)));
     url.searchParams.set("country", env.discoverySearchCountry);
     url.searchParams.set("search_lang", "en");
     url.searchParams.set("safesearch", "strict");
@@ -241,7 +328,8 @@ export async function searchCreatorProfiles(input: DiscoverySearchInput) {
       limit: plans.length === 1 ? input.limit : Math.min(input.limit, 10),
     };
     const rawResults = await backend.run(plan.query, queryInput);
-    collected.push(...filterDiscoveryWebResults(rawResults, plan.categories));
+    const profileResults = await resolveSocialProfileResults(rawResults, plan.channels);
+    collected.push(...filterDiscoveryWebResults(profileResults, plan.categories));
     results = normalizeDiscoveryResults(collected, input.channels, input.limit);
     if (results.length >= input.limit) break;
   }

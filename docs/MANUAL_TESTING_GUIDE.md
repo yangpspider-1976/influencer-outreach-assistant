@@ -106,7 +106,7 @@ The main demo campaign is **ABC Korean Restaurant Creator Visit**. The supplied 
 2. On the **Map columns** screen, confirm that each field dropdown contains the expected source header. From the **Notes** dropdown, select **Not mapped**, then select **Validate rows**. Expected: the Notes column is ignored during validation.
 3. Expected validation total:
 
-   > **Total rows: 10 · Valid: 6 · Warning: 2 · Rejected: 2 · Selected for import: 7**
+   > **Total rows: 12 · Valid: 8 · Warning: 2 · Rejected: 2 · Selected for import: 9**
 
 4. Verify these representative rows:
 
@@ -116,12 +116,14 @@ The main demo campaign is **ABC Korean Restaurant Creator Visit**. The supplied 
    | Bea Ocampo | Informational note that extra social-URL path segments were removed. |
    | Miguel Garcia | Informational notes for a reconstructed `@miguelgarciaeats` handle and raw `50k-80k` follower text. |
    | Camille Mendoza | Duplicate warning; deselected by default. |
-   | Rafael Torres | Rejected because TikTok is not a supported domain. |
+   | Rafael Torres | Valid TikTok creator profile. |
+   | Lena Cruz | Valid YouTube creator channel. |
+   | Broken Creator | Rejected because the profile URL is on an unsupported domain. |
    | Isabel Villanueva | Warning: no social profile, so the creator can be stored but cannot be queued. |
    | Empty final row | Rejected because it has no name or usable profile. |
 
 5. Above the validation table, select **Download error file**. Expected: a CSV containing warnings and rejected rows downloads.
-6. Below the validation table, select **Commit 7 rows**. Expected: **Imported 7 · New creators 7 · Linked to existing 0 · Added to campaign 6 · Blocked (DNC) 0**.
+6. Below the validation table, select **Commit 9 rows**. Expected: **Imported 9 · New creators 9 · Linked to existing 0 · Added to campaign 8 · Blocked (DNC) 0**.
 7. Test duplicate matching using the supplied [`duplicate-test.csv`](duplicate-test.csv):
 
    ```csv

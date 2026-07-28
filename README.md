@@ -1,14 +1,15 @@
 # QROAD Influencer Outreach Assistant
 
-A human-in-the-loop tool for managing personalized Facebook and Instagram influencer outreach.
+A human-in-the-loop tool for managing personalized influencer outreach across Instagram,
+Facebook, TikTok, and YouTube.
 
 The system automates campaign preparation, list management, personalization, profile launching,
 copying, tracking and follow-up scheduling. **A human operator performs the final paste, review and
-Send action inside Facebook or Instagram for every first-contact DM.**
+Send action inside the selected social platform for every first-contact DM.**
 
-> **Non-negotiable boundary.** This application never signs in to Meta platforms, never stores Meta
-> passwords/cookies/session data, never scrapes profiles, never types into or clicks inside Facebook
-> or Instagram, and never sends a message. It opens a saved profile URL in a new tab with a normal
+> **Non-negotiable boundary.** This application never signs in to social platforms, never stores
+> platform passwords/cookies/session data, never scrapes profiles, never types into or clicks inside
+> Instagram, Facebook, TikTok, or YouTube, and never sends a message. It opens a saved profile URL in a new tab with a normal
 > link and copies prepared text to the clipboard after a user gesture. Nothing more.
 
 ---
@@ -126,7 +127,7 @@ verified directly:
 
 | Module | Responsibility | Requirement |
 | --- | --- | --- |
-| `src/lib/social-url.ts` | Instagram/Facebook URL normalization, follower parsing | FR-010, FR-011, AC-003 |
+| `src/lib/social-url.ts` | Social profile URL normalization, follower parsing | FR-010, FR-011, AC-003 |
 | `src/lib/template.ts` | Variable rendering, unresolved-token detection | FR-015, §9 |
 | `src/lib/status.ts` | Status model and allowed transitions | FR-021 |
 | `src/lib/follow-up.ts` | Follow-up scheduling and cancellation rules | FR-022, §13 |
@@ -175,15 +176,17 @@ See [`.env.example`](.env.example) for the annotated list. The important ones:
 ### Creator discovery
 
 Admins and Campaign Managers can use **Creator discovery** to search a public web index for
-Instagram and Facebook profile links using keywords, category, location, channel, and a maximum of
+Instagram, Facebook, TikTok, and YouTube profile links using keywords, category, location, channel, and a maximum of
 5, 10, or 20 results. Access is limited to roles with influencer-import permission; saving reuses
 the same normalized-URL duplicate protection as CSV import.
 
 The feature never opens or scrapes profile pages and does not collect follower counts, contact
-details, cookies, or platform credentials. Configure `BRAVE_SEARCH_API_KEY` with a Brave Search API
-plan whose terms permit saving user-reviewed profile URLs for automatic results. Without a key,
+details, cookies, or platform credentials. When the public web index returns a YouTube video
+instead of its channel, the server may use YouTube's public oEmbed metadata only to resolve the
+creator name and channel URL. Configure one of the supported discovery providers with terms that
+permit saving user-reviewed profile URLs for automatic results. Without a key,
 the free manual-assisted workflow generates targeted Google search links and lets the user paste,
-or import from the clipboard, validate, deduplicate, and save reviewed Instagram or Facebook
+or import from the clipboard, validate, deduplicate, and save reviewed social
 profile URLs. Browser security prevents the application from reading results in the separate
 Google tab, so the user must still copy the links they choose to keep.
 

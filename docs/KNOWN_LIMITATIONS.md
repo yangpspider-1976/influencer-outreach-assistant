@@ -30,7 +30,7 @@ These are not defects. They are the reason the product is safe to operate.
 | Single sign-on | Not implemented | Email/password with Argon2id and epoch-based invalidation. The design is SSO-ready. |
 | Client portal and client-facing approvals | Not implemented | The Viewer role covers read-only client service internally. |
 | Direct creator-platform / Creator Marketplace integrations | Not implemented | Requires separate policy and legal review. |
-| Profile enrichment | Partially implemented | Creator discovery can find public profile links through a configured web-search provider, but it never scrapes profiles or collects follower/contact data. |
+| Profile enrichment | Partially implemented | Creator discovery can find public profile links through a configured web-search provider. YouTube video hits may be resolved to their public creator name and channel URL through oEmbed, but the app never scrapes profile pages or collects follower/contact data. |
 | Calendar and Slack notifications | Not implemented | In-app badges and the follow-up queue cover reminders. |
 | Billing, payment settlement, contracts | Not implemented | Out of MVP scope. |
 | Advanced profitability / creator-performance analytics | Not implemented | Campaign funnel, operator productivity and CSV/XLSX export are available for external analysis. |

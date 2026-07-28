@@ -1,5 +1,5 @@
 import type { DiscoverySearchInput } from "./validation";
-import { normalizeProfileUrl, type SocialPlatform } from "./social-url";
+import { normalizeProfileUrl, SOCIAL_PLATFORM_LABELS, type SocialPlatform } from "./social-url";
 
 export type DiscoveryResult = {
   platform: SocialPlatform;
@@ -32,11 +32,39 @@ export type ManualProfileCandidate = {
 const PLATFORM_DOMAINS: Record<SocialPlatform, string> = {
   INSTAGRAM: "instagram.com",
   FACEBOOK: "facebook.com",
+  TIKTOK: "tiktok.com",
+  YOUTUBE: "youtube.com",
+};
+
+/**
+ * Automatic search only accepts profile URLs, so target profile-shaped paths
+ * up front on platforms whose indexes are dominated by individual posts or
+ * videos. This leaves fewer unusable hits for the result normalizer to discard.
+ */
+const PLATFORM_PROFILE_SITE_SCOPES: Record<SocialPlatform, string[]> = {
+  INSTAGRAM: ["site:instagram.com"],
+  FACEBOOK: ["site:facebook.com"],
+  TIKTOK: ["site:tiktok.com/@"],
+  YOUTUBE: [
+    "site:youtube.com/@",
+    "site:youtube.com/channel/",
+    "site:youtube.com/c/",
+    "site:youtube.com/user/",
+  ],
+};
+
+const PLATFORM_CREATOR_TERMS: Record<SocialPlatform, string> = {
+  INSTAGRAM: '("Instagram creator" OR influencer OR blogger)',
+  FACEBOOK: '("Facebook creator" OR "content creator" OR blogger)',
+  TIKTOK: '("TikTok creator" OR TikToker OR influencer)',
+  YOUTUBE: '(YouTuber OR "YouTube creator" OR vlogger)',
 };
 
 const PROFILE_SEARCH_BIAS: Record<SocialPlatform, string> = {
   INSTAGRAM: "-inurl:/p/ -inurl:/reel/ -inurl:/stories/ -inurl:/explore/ -inurl:/tv/",
   FACEBOOK: "-inurl:/posts/ -inurl:/reel/ -inurl:/watch/ -inurl:/videos/ -inurl:/photos/",
+  TIKTOK: "-inurl:/video/ -inurl:/tag/ -inurl:/music/ -inurl:/discover/ -inurl:/embed/",
+  YOUTUBE: "-inurl:/watch -inurl:/shorts/ -inurl:/playlist -inurl:/embed/ -inurl:/results",
 };
 
 const CATEGORY_SEARCH_EXPANSIONS: Record<string, string[]> = {
@@ -459,7 +487,12 @@ function categorySearchTerms(category: string): string[] {
 function locationSearchTerms(location: string): string[] {
   const normalized = normalizedKey(location);
   if (normalized === "metro manila" || normalized === "all metro manila") {
-    return ['"Metro Manila"', '"Manila Philippines"'];
+    return [
+      '("Metro Manila" OR NCR OR "Manila Philippines")',
+      '("Caloocan" OR "Las Piñas" OR Makati OR Malabon OR Mandaluyong OR Manila OR Marikina OR Muntinlupa OR Navotas OR Parañaque OR Pasay OR Pasig OR Pateros OR "Quezon City" OR "San Juan" OR Taguig OR Valenzuela)',
+      '("Quezon City" OR Makati OR Taguig OR Pasig OR Mandaluyong)',
+      '(Manila OR Pasay OR "Las Piñas" OR Parañaque OR Muntinlupa OR Caloocan OR Marikina OR Malabon OR Navotas OR Pateros OR "San Juan" OR Valenzuela)',
+    ];
   }
   return [quoteSearchTerm(location)];
 }
@@ -477,10 +510,18 @@ function buildFocusedDiscoveryQuery({
 }): string {
   const parts: string[] = [];
   if (keywords) parts.push(quoteSearchTerm(keywords));
-  parts.push(categoryTerm ? `${categoryTerm} creator influencer content creator` : "creator influencer content creator");
+  const creatorTerms = uniqueValues(channels.map((channel) => PLATFORM_CREATOR_TERMS[channel]));
+  const creatorGroup = creatorTerms.length === 1 ? creatorTerms[0] : `(${creatorTerms.join(" OR ")})`;
+  parts.push(
+    categoryTerm
+      ? `${categoryTerm} ${creatorGroup} content creator`
+      : `${creatorGroup} content creator`,
+  );
   if (locationTerm) parts.push(locationTerm);
 
-  const sites = channels.map((channel) => `site:${PLATFORM_DOMAINS[channel]}`).join(" OR ");
+  const sites = uniqueValues(
+    channels.flatMap((channel) => PLATFORM_PROFILE_SITE_SCOPES[channel]),
+  ).join(" OR ");
   return `${parts.join(" ")} (${sites})`;
 }
 
@@ -556,8 +597,8 @@ export function buildDiscoverySearchPlans(
     ...categoryVariants.map((category) => ("terms" in category ? category.terms.length : 1)),
   );
 
-  for (let termIndex = 0; termIndex < maxTermCount; termIndex += 1) {
-    for (const locationTerm of locationVariants) {
+  for (const locationTerm of locationVariants) {
+    for (let termIndex = 0; termIndex < maxTermCount; termIndex += 1) {
       for (const category of categoryVariants) {
         const term = "terms" in category ? category.terms[termIndex] : category.term;
         if (term === undefined) continue;
@@ -658,7 +699,7 @@ export function buildManualSearchUrl(
 export function extractProfileUrlsFromText(text: string): string[] {
   const matches =
     text.match(
-      /(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.me)\/[^\s<>"'`]+/gi,
+      /(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:instagram\.com|instagr\.am|facebook\.com|fb\.com|fb\.me|tiktok\.com|youtube\.com|youtu\.be)\/[^\s<>"'`]+/gi,
     ) ?? [];
   const profiles: string[] = [];
   const seen = new Set<string>();
@@ -688,10 +729,12 @@ function plainText(value: string): string {
 
 function displayNameFromResult(title: string, username: string | null): string {
   const cleaned = plainText(title)
-    .replace(/\s*[|·•-]\s*(Instagram|Facebook).*$/i, "")
+    .replace(/\s*[|·•-]\s*(Instagram|Facebook|TikTok|YouTube).*$/i, "")
     .replace(/\s*\(@[^)]+\).*$/i, "")
     .trim();
-  if (cleaned && !/^(instagram|facebook)$/i.test(cleaned)) return cleaned.slice(0, 200);
+  if (cleaned && !/^(instagram|facebook|tiktok|youtube)$/i.test(cleaned)) {
+    return cleaned.slice(0, 200);
+  }
   return username ? `@${username}` : "Discovered creator";
 }
 
@@ -708,7 +751,7 @@ export function normalizeDiscoveryResults(
     let normalized: ReturnType<typeof normalizeProfileUrl> | null = null;
     for (const channel of channels) {
       const candidate = normalizeProfileUrl(result.url, channel);
-      if (candidate.ok) {
+      if (candidate.ok && candidate.platform === channel) {
         normalized = candidate;
         break;
       }
@@ -789,4 +832,8 @@ export function parseManualProfileUrls(
   }
 
   return { profiles, errors };
+}
+
+export function socialPlatformLabel(platform: SocialPlatform): string {
+  return SOCIAL_PLATFORM_LABELS[platform];
 }

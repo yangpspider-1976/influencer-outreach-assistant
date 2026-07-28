@@ -78,7 +78,7 @@ Storing permissions as data lets an administrator enable the entries the work or
 | Column | Type | Notes |
 | --- | --- | --- |
 | `influencerId` | fk → `influencers` | Cascade delete |
-| `platform` | enum | `INSTAGRAM`, `FACEBOOK` |
+| `platform` | enum | `INSTAGRAM`, `FACEBOOK`, `TIKTOK`, `YOUTUBE` |
 | `originalUrl` | text | Preserved exactly as uploaded |
 | `normalizedUrl` | text | Canonical dedupe key, e.g. `instagram.com/examplecreator` |
 | `usernameHint` | text? | Handle or numeric id |
@@ -146,7 +146,7 @@ The join between a campaign and an influencer, and the unit of operator work.
 | --- | --- | --- |
 | `campaignInfluencerId` | fk | Cascade delete |
 | `type` | enum | `FIRST_CONTACT`, `FOLLOW_UP` |
-| `channel` | enum? | `INSTAGRAM`, `FACEBOOK` |
+| `channel` | enum? | `INSTAGRAM`, `FACEBOOK`, `TIKTOK`, `YOUTUBE` |
 | `templateVersionId` | fk? | Exact template version in force |
 | `preparedText` | text | What the system rendered |
 | `confirmedSentText` | text? | **The exact text the operator confirmed sending** (AC-007) |

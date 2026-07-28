@@ -129,7 +129,7 @@ Setting DNC also withdraws the creator from every unfinished outreach record and
 follow-ups. **Clearing** DNC requires `dnc_override` (administrator) and a written reason of at least
 10 characters. Both directions are audited.
 
-Discovery search is read-only against Instagram/Facebook: the server queries Brave Search, filters
+Discovery search is read-only against supported social platforms: the server queries Brave Search, filters
 the response to supported profile URLs, and checks them against the local database. It never fetches
 the profile page. Search and save actions are audited separately.
 

@@ -8,10 +8,20 @@ import {
   buildManualSearchUrl,
   extractProfileUrlsFromText,
   parseManualProfileUrls,
+  socialPlatformLabel,
   type DiscoveryResult,
 } from "@/lib/discovery";
+import type { SocialPlatform } from "@/lib/social-url";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Checkbox, Field, FormError, Input, SelectMenu, Textarea } from "@/components/ui/form";
+import {
+  Checkbox,
+  Field,
+  FormError,
+  InfoTooltip,
+  Input,
+  SelectMenu,
+  Textarea,
+} from "@/components/ui/form";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge, Callout, Card, CardHeader, EmptyState } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
@@ -34,6 +44,15 @@ type SaveResponse = {
   }[];
 };
 
+const DISCOVERY_CHANNELS: SocialPlatform[] = ["INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE"];
+
+const PLATFORM_BADGE_TONE: Record<SocialPlatform, "info" | "progress" | "positive" | "warning"> = {
+  INSTAGRAM: "progress",
+  FACEBOOK: "info",
+  TIKTOK: "positive",
+  YOUTUBE: "warning",
+};
+
 export function DiscoveryWorkspace({
   configured,
   canSave,
@@ -49,11 +68,8 @@ export function DiscoveryWorkspace({
   const [keywords, setKeywords] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [channels, setChannels] = useState<("INSTAGRAM" | "FACEBOOK")[]>([
-    "INSTAGRAM",
-    "FACEBOOK",
-  ]);
-  const [limit, setLimit] = useState(10);
+  const [channels, setChannels] = useState<SocialPlatform[]>([...DISCOVERY_CHANNELS]);
+  const [limit, setLimit] = useState(5);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
@@ -65,9 +81,8 @@ export function DiscoveryWorkspace({
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const hasCriteria = Boolean(
-    keywords.trim() || selectedCategories.length > 0 || selectedLocations.length > 0,
-  );
+  const hasRequiredCriteria =
+    selectedCategories.length > 0 && selectedLocations.length > 0;
   // A saved creator is stamped with a category/location only when the filter is
   // unambiguous (exactly one chosen); otherwise it is left for manual review.
   const saveCategory = selectedCategories.length === 1 ? selectedCategories[0] : "";
@@ -98,7 +113,7 @@ export function DiscoveryWorkspace({
     [channels, keywords, limit, selectedCategories, selectedLocations],
   );
 
-  function toggleChannel(channel: "INSTAGRAM" | "FACEBOOK") {
+  function toggleChannel(channel: SocialPlatform) {
     setChannels((current) =>
       current.includes(channel)
         ? current.filter((entry) => entry !== channel)
@@ -108,6 +123,10 @@ export function DiscoveryWorkspace({
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasRequiredCriteria) {
+      setError("Select at least one category and one location before searching.");
+      return;
+    }
     if (!configured) {
       setManualReady(true);
       setManualError(null);
@@ -134,8 +153,13 @@ export function DiscoveryWorkspace({
   }
 
   function prepareManualSearch() {
+    if (!hasRequiredCriteria) {
+      setError("Select at least one category and one location before searching.");
+      return;
+    }
     setManualReady(true);
     setManualError(null);
+    setError(null);
   }
 
   async function importFromClipboard() {
@@ -151,7 +175,7 @@ export function DiscoveryWorkspace({
       const links = extractProfileUrlsFromText(clipboardText);
       if (links.length === 0) {
         setManualError(
-          "No direct Instagram or Facebook profile links were found on the clipboard.",
+          "No direct Instagram, Facebook, TikTok or YouTube profile links were found on the clipboard.",
         );
         return;
       }
@@ -274,7 +298,7 @@ export function DiscoveryWorkspace({
       <Card>
         <CardHeader
           title="Find creators"
-          description="Set the audience criteria once, then search Instagram and Facebook from the guided review step."
+          description="Set the audience criteria once, then search the selected creator channels from the guided review step."
           action={
             <Badge tone={configured ? "positive" : "info"}>
               {configured ? "Automatic search available" : "Manual search"}
@@ -291,6 +315,38 @@ export function DiscoveryWorkspace({
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Field
+              label="Category"
+              htmlFor="discovery-category"
+              hint="Required. Choose one, several, or all."
+              required
+            >
+              <MultiSelect
+                id="discovery-category"
+                options={categoryOptions}
+                selected={selectedCategories}
+                onChange={setSelectedCategories}
+                placeholder="Select category"
+                allLabel="All categories"
+                disabled={searching}
+              />
+            </Field>
+            <Field
+              label="Location"
+              htmlFor="discovery-location"
+              hint="Required. Choose a Metro Manila area."
+              required
+            >
+              <MultiSelect
+                id="discovery-location"
+                options={locationOptions}
+                selected={selectedLocations}
+                onChange={setSelectedLocations}
+                placeholder="Select location"
+                allLabel="All Metro Manila"
+                disabled={searching}
+              />
+            </Field>
+            <Field
               label="Keywords"
               htmlFor="discovery-keywords"
               hint="Optional. Niche, content style, audience, or campaign topic."
@@ -304,68 +360,42 @@ export function DiscoveryWorkspace({
                 disabled={searching}
               />
             </Field>
-            <Field
-              label="Category"
-              htmlFor="discovery-category"
-              hint="Choose one, several, or all."
-            >
-              <MultiSelect
-                id="discovery-category"
-                options={categoryOptions}
-                selected={selectedCategories}
-                onChange={setSelectedCategories}
-                placeholder="Any category"
-                allLabel="All categories"
-                disabled={searching}
-              />
-            </Field>
-            <Field
-              label="Location"
-              htmlFor="discovery-location"
-              hint="Metro Manila cities."
-            >
-              <MultiSelect
-                id="discovery-location"
-                options={locationOptions}
-                selected={selectedLocations}
-                onChange={setSelectedLocations}
-                placeholder="Any location"
-                allLabel="All Metro Manila"
-                disabled={searching}
-              />
-            </Field>
           </div>
 
           <div className="-mx-5 -mb-5 mt-5 flex flex-col gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-4 sm:grid-cols-[minmax(240px,1fr)_180px]">
               <Field label="Channels" required>
                 <div className="flex min-h-9 flex-wrap items-center gap-5">
-                  <Checkbox
-                    id="discovery-instagram"
-                    label="Instagram"
-                    checked={channels.includes("INSTAGRAM")}
-                    onChange={() => toggleChannel("INSTAGRAM")}
-                    disabled={searching}
-                  />
-                  <Checkbox
-                    id="discovery-facebook"
-                    label="Facebook"
-                    checked={channels.includes("FACEBOOK")}
-                    onChange={() => toggleChannel("FACEBOOK")}
-                    disabled={searching}
-                  />
+                  {DISCOVERY_CHANNELS.map((channel) => (
+                    <Checkbox
+                      key={channel}
+                      id={`discovery-${channel.toLowerCase()}`}
+                      label={socialPlatformLabel(channel)}
+                      checked={channels.includes(channel)}
+                      onChange={() => toggleChannel(channel)}
+                      disabled={searching}
+                    />
+                  ))}
                 </div>
               </Field>
-              <Field label="Maximum results" htmlFor="discovery-limit">
+              <Field
+                label="Maximum results"
+                htmlFor="discovery-limit"
+                labelAccessory={
+                  <InfoTooltip label="About maximum results">
+                    The actual count depends on available unique, relevant profiles.
+                  </InfoTooltip>
+                }
+              >
                 <SelectMenu
                   id="discovery-limit"
                   value={String(limit)}
                   onChange={(value) => setLimit(Number(value))}
                   disabled={searching}
                 >
-                  <option value={5}>5 results</option>
-                  <option value={10}>10 results</option>
-                  <option value={20}>20 results</option>
+                  <option value={5}>Up to 5 results</option>
+                  <option value={10}>Up to 10 results</option>
+                  <option value={20}>Up to 20 results</option>
                 </SelectMenu>
               </Field>
             </div>
@@ -374,7 +404,7 @@ export function DiscoveryWorkspace({
                 <Button
                   type="submit"
                   className="order-2"
-                  disabled={searching || channels.length === 0 || !hasCriteria}
+                  disabled={searching || channels.length === 0 || !hasRequiredCriteria}
                   icon={
                     searching ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -391,7 +421,7 @@ export function DiscoveryWorkspace({
                 className="order-1"
                 variant={configured ? "secondary" : "primary"}
                 onClick={configured ? prepareManualSearch : undefined}
-                disabled={searching || channels.length === 0 || !hasCriteria}
+                disabled={searching || channels.length === 0 || !hasRequiredCriteria}
                 icon={<ChevronDown className="size-4" aria-hidden />}
               >
                 Manual search
@@ -434,7 +464,7 @@ export function DiscoveryWorkspace({
                     rel="noopener noreferrer"
                     className={buttonClasses("secondary", "md", "w-full justify-between")}
                   >
-                    Search {channel === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                    Search {socialPlatformLabel(channel)}
                     <ExternalLink className="size-4" aria-hidden />
                   </a>
                 ))}
@@ -475,7 +505,7 @@ export function DiscoveryWorkspace({
               <Field
                 label="Profile URLs"
                 htmlFor="manual-profile-urls"
-                hint={`Instagram or Facebook profile URLs, one per line. Maximum ${limit}.`}
+                hint={`Instagram, Facebook, TikTok or YouTube profile URLs, one per line. Maximum ${limit}.`}
                 className="mt-4"
               >
                 <Textarea
@@ -484,7 +514,7 @@ export function DiscoveryWorkspace({
                   value={manualUrls}
                   onChange={(event) => setManualUrls(event.target.value)}
                   placeholder={
-                    "https://www.instagram.com/creatorname/\nhttps://www.facebook.com/creatorname/"
+                    "https://www.instagram.com/creatorname/\nhttps://www.facebook.com/creatorname/\nhttps://www.tiktok.com/@creatorname\nhttps://www.youtube.com/@creatorname"
                   }
                   disabled={manualSaving}
                 />
@@ -517,8 +547,8 @@ export function DiscoveryWorkspace({
                           <span className="min-w-0 truncate font-mono text-slate-600">
                             {profile.profileUrl}
                           </span>
-                          <Badge tone={profile.platform === "INSTAGRAM" ? "progress" : "info"}>
-                            {profile.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                          <Badge tone={PLATFORM_BADGE_TONE[profile.platform]}>
+                            {socialPlatformLabel(profile.platform)}
                           </Badge>
                         </li>
                       ))}
@@ -626,8 +656,8 @@ export function DiscoveryWorkspace({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-slate-900">{result.displayName}</p>
-                          <Badge tone={result.platform === "INSTAGRAM" ? "progress" : "info"}>
-                            {result.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}
+                          <Badge tone={PLATFORM_BADGE_TONE[result.platform]}>
+                            {socialPlatformLabel(result.platform)}
                           </Badge>
                           {result.existingInfluencer ? (
                             <Badge tone="positive">Already in database</Badge>
