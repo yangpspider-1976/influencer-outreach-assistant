@@ -13,8 +13,9 @@ import { env } from "./env";
  *   - Local filesystem (development / persistent-disk hosts). Keys are
  *     server-generated relative paths; traversal out of the root is refused.
  *   - Vercel Blob (serverless hosts, where the filesystem is read-only) when
- *     BLOB_READ_WRITE_TOKEN is set. The blob path carries a random suffix and
- *     the URL is kept server-side, so files are not discoverable in practice.
+ *     BLOB_READ_WRITE_TOKEN is set. A private store is used, so reading a blob
+ *     requires the store token — the app fetches bytes server-side and streams
+ *     them through the same authorized routes.
  *
  * The stored "key" is a relative path in filesystem mode and a full blob URL in
  * Blob mode; callers treat it as an opaque handle.
@@ -47,7 +48,7 @@ export async function putFile(
   if (useBlob) {
     const { put } = await import("@vercel/blob");
     const blob = await put(key, data, {
-      access: "public",
+      access: "private",
       token: env.blobReadWriteToken!,
       addRandomSuffix: true,
       contentType: contentTypeFor(originalName),
@@ -63,11 +64,12 @@ export async function putFile(
 
 export async function getFile(key: string): Promise<Buffer> {
   if (isRemoteKey(key)) {
-    const response = await fetch(key, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Stored file could not be read (${response.status}).`);
+    const { get } = await import("@vercel/blob");
+    const result = await get(key, { access: "private", token: env.blobReadWriteToken! });
+    if (!result?.stream) {
+      throw new Error("Stored file could not be read.");
     }
-    return Buffer.from(await response.arrayBuffer());
+    return Buffer.from(await new Response(result.stream).arrayBuffer());
   }
   return fs.readFile(resolveKey(key));
 }
