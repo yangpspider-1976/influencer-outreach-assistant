@@ -27,6 +27,9 @@ export const env = {
     return secret;
   },
   storageDir: process.env.STORAGE_DIR || "./.storage",
+  // When set (e.g. on Vercel), uploaded/exported files go to Vercel Blob instead
+  // of the local filesystem, which is read-only on serverless hosts.
+  blobReadWriteToken: process.env.BLOB_READ_WRITE_TOKEN?.trim() || null,
   sessionIdleTimeoutMinutes: int("SESSION_IDLE_TIMEOUT_MINUTES", 60),
   maxUploadBytes: int("MAX_UPLOAD_MB", 10) * 1024 * 1024,
   maxImportRows: int("MAX_IMPORT_ROWS", 5000),

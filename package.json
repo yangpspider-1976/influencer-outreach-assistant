@@ -20,12 +20,14 @@
     "test:acceptance": "node scripts/acceptance-walkthrough.mjs",
     "test:ui": "node scripts/ui-smoke.mjs",
     "verify:no-demo-creds": "node scripts/verify-no-demo-credentials.mjs",
-    "db:demo-reset": "tsx prisma/reset-demo-data.ts"
+    "db:demo-reset": "tsx prisma/reset-demo-data.ts",
+    "db:bootstrap": "tsx prisma/bootstrap.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
+    "@vercel/blob": "^2.6.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
