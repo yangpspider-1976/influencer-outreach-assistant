@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { ShieldAlert, Users } from "lucide-react";
 import { requirePageUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
 import { has } from "@/lib/rbac";
 import { formatCompactNumber } from "@/lib/format";
 import { SOCIAL_PLATFORM_LABELS } from "@/lib/social-url";
@@ -47,10 +46,15 @@ export default async function InfluencersPage({
   const params = await searchParams;
   const page = Math.max(Number(params.page ?? 1), 1);
 
-  // Demo/actual separation is a development affordance only — production data
-  // never carries the demo flag, so the tabs are hidden there.
-  const showTabs = !env.isProduction;
   const view = params.view === "demo" ? "demo" : "actual";
+
+  // Show the Actual/Demo tabs whenever the database contains demo-seed records
+  // (development, or a demo/showcase deployment). Real production data carries
+  // no demo flag, so the tabs stay hidden there.
+  const demoTotal = await prisma.influencer.count({
+    where: { isDemo: true, archivedAt: null },
+  });
+  const showTabs = demoTotal > 0;
 
   const baseWhere: Prisma.InfluencerWhereInput = {
     archivedAt: null,
