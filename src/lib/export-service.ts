@@ -220,6 +220,9 @@ async function collect(
       const rows = await prisma.influencer.findMany({
         where: {
           archivedAt: null,
+          // Never export the demo dataset — only real, user-entered creators.
+          // (Production data never carries the demo flag.)
+          isDemo: false,
           ...(filters.category
             ? { category: { contains: filters.category, mode: "insensitive" } }
             : {}),

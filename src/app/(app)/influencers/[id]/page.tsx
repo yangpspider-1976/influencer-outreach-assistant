@@ -172,24 +172,6 @@ export default async function InfluencerDetailPage({
         </div>
 
         <div className="space-y-6">
-          <ProfilePanel
-            influencerId={influencer.id}
-            canEdit={has(user.permissions, "influencers_write")}
-            tags={influencer.tags.map((link) => ({ tagId: link.tagId, name: link.tag.name }))}
-            values={{
-              displayName: influencer.displayName,
-              firstName: influencer.firstName ?? "",
-              category: influencer.category,
-              location: influencer.location,
-              followerCountRaw: influencer.followerCountRaw ?? "",
-              followerCountNumeric: influencer.followerCountNumeric,
-              email: influencer.email ?? "",
-              phone: influencer.phone ?? "",
-              rate: influencer.rate ?? "",
-              notes: influencer.notes,
-            }}
-          />
-
           <Card>
             <CardHeader title="Social profiles" description="Saved links used to launch the profile." />
             <ul className="divide-y divide-slate-100">
@@ -227,6 +209,24 @@ export default async function InfluencerDetailPage({
               )}
             </ul>
           </Card>
+
+          <ProfilePanel
+            influencerId={influencer.id}
+            canEdit={has(user.permissions, "influencers_write")}
+            tags={influencer.tags.map((link) => ({ tagId: link.tagId, name: link.tag.name }))}
+            values={{
+              displayName: influencer.displayName,
+              firstName: influencer.firstName ?? "",
+              category: influencer.category,
+              location: influencer.location,
+              followerCountRaw: influencer.followerCountRaw ?? "",
+              followerCountNumeric: influencer.followerCountNumeric,
+              email: influencer.email ?? "",
+              phone: influencer.phone ?? "",
+              rate: influencer.rate ?? "",
+              notes: influencer.notes,
+            }}
+          />
         </div>
       </div>
     </Page>
