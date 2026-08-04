@@ -51,3 +51,6 @@ next-env.d.ts
 
 # UI smoke-test screenshots
 /shots
+
+.vercel
+.env*
